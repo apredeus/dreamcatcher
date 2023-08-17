@@ -5,7 +5,12 @@
 ## (need to think about how this would work with Singularity)
 
 use strict; 
-use warnings; 
+use warnings;
+
+if (scalar @ARGV != 1) { 
+	print STDERR "USAGE: ./make_umi_fastq.pl <STARsolo or Cell/Space Ranger directory>\n"; 
+	exit 1; 
+} 
 
 my $dir = shift @ARGV; 
 
@@ -63,9 +68,51 @@ if (-d $dir."/output" && -e $dir."/Log.final.out" && -e $dir."/Unmapped.out.mate
 		} 
 		$nr++; 
 	}
-}
+  close R1;
+  close R2;
+} else { 
+  ## here we assume the presence of a Cell/Space Ranger/STARsolo-formatted BAM file: 
+	## single- or paired-end (meaning biological reads), with CR and UR set for all reads, and CB/UB for reads that mapped successfully
+	## we will take only unmapped reads (-f4), and only R2 for paired-end reads (-f128)
+	## since all the BAM files are named differently, we would need to do a little sing-and-a-dance first: 
+	my $bam = `find $dir/* | grep -iv atac | grep \"\.bam\$\"`; 
+	chomp $bam; 
+	if (length $bam) { 
+		print STDERR "Sample is assumed to be Cell/Space Ranger/STARsolo BAM! \nMaking a single-end, UMI-tools-formatted fastq file..\n";
+	} else { 
+		print STDERR "ERROR: failed to find a BAM file in the directory provided!\n"; 
+		exit 1; 
+	}
+	print STDERR "Using files: \nBAM = $bam\n";
 
-close R1;
-close R2;
-## TODO: make same thing for Cell Ranger with a BAM in it
+	## we need to check if the file was mapped as paired-end; this changes what R1 and R2 actually are.
+	## if $paired == 1, flags 64/128 will be set (R1 will be trimmed for BC+UMI).  
+	my $preads = `samtools view -h $bam | head -10000 | samtools flagstat - | grep \"properly paired\" | cut -d' ' -f1`; 
+	my $paired = ($preads > 0) ? 1 : 0; 
+	if ($paired) { 
+		print STDERR "Sample was determined to be 5' 10x paired-end experiment!\n";
+	} else { 
+		print STDERR "Sample was determined to be 3'/5' 10x single-end experiment!\n"; 
+	} 
 
+	## now do the processing. We keep only the BC+UMI part of the barcode read
+	## this would lose some biological info in case of PE 5' experiments, but I think it should not matter this much for bacterial reads
+	if ($paired) { 
+		open BAM,"samtools view -\@4 -f132 $bam |" or die "ERROR: failed to open the bam file using samtools!";
+	} else { 
+		open BAM,"samtools view -\@4 -f4 $bam |" or die "ERROR: failed to open the bam file using samtools!";
+	}
+
+	while (<BAM>) { 
+    my ($rname,$bc,$umi,$seq,$qual) = ('') x 5;
+    $rname = (split /\t/)[0];
+    $seq   = (split /\t/)[9];
+    $qual  = (split /\t/)[10];
+    m/CR:\w:(\w+)\t.*UR:\w:(\w+)\t/;
+    $bc = $1;
+    $umi = $2; 
+    printf "@%s_%s_%s\n%s\n+\n%s\n",$rname,$bc,$umi,$seq,$qual;
+	} 
+	
+	close BAM;
+} 
