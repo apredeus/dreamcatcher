@@ -14,7 +14,7 @@ if (scalar @ARGV != 1) {
 
 my $dir = shift @ARGV; 
 
-if (-d $dir."/output" && -e $dir."/Log.final.out" && -e $dir."/Unmapped.out.mate1.gz" && $dir."//Unmapped.out.mate2.gz" ) { 
+if (-d $dir."/output" && -e $dir."/Log.final.out") { 
 	print STDERR "Sample was determined to be STARsolo output! \nMaking a single-end, UMI-tools-formatted fastq file..\n";
 	
 	## we need to check if the file was mapped as paired-end; this changes what R1 and R2 actually are.
@@ -33,19 +33,36 @@ if (-d $dir."/output" && -e $dir."/Log.final.out" && -e $dir."/Unmapped.out.mate
 
 	## now do the processing. We keep only the BC+UMI part of the barcode read
 	## this would lose some biological info in case of PE 5' experiments, but I think it should not matter this much for bacterial reads
-	my $R1 = ($paired) ? $dir."/Unmapped.out.mate1.gz" : $dir."/Unmapped.out.mate2.gz"; 
-	my $R2 = ($paired) ? $dir."/Unmapped.out.mate2.gz" : $dir."/Unmapped.out.mate1.gz"; 
-  print STDERR "Using files:\nR1 = $R1\nR2 = $R2\n"; 	
-  ## this occasionally stupid concoction reads 2 fastq files synchronously. 
-	open R1,"zcat $R1 |" or die "$!"; 
-	open R2,"zcat $R2 |" or die "$!"; 
+	my ($R1,$R2) = ('') x 2;
+	if (-e $dir."/Unmapped.out.mate1.gz" && -e $dir."/Unmapped.out.mate2.gz") { 
+	  $R1 = ($paired) ? $dir."/Unmapped.out.mate1.gz" : $dir."/Unmapped.out.mate2.gz"; 
+	  $R2 = ($paired) ? $dir."/Unmapped.out.mate2.gz" : $dir."/Unmapped.out.mate1.gz";
+	} elsif (-e $dir."/Unmapped.out.mate1.bz2" && -e $dir."/Unmapped.out.mate2.bz2") {
+	  $R1 = ($paired) ? $dir."/Unmapped.out.mate1.bz2" : $dir."/Unmapped.out.mate2.bz2"; 
+	  $R2 = ($paired) ? $dir."/Unmapped.out.mate2.bz2" : $dir."/Unmapped.out.mate1.bz2";
+	} else { 
+		print STDERR "Cannot find unmapped read files Unmapped.out.mate(1/2).<gz/bz2> in the STARsolo directory! Exiting .."; 
+		exit 1; 
+	}
+
+  print STDERR "Using unmapped STARsolo files:\nR1 = $R1\nR2 = $R2\n"; 	
+  ## this occasionally stupid concoction reads 2 fastq files synchronously.
+	if ($R1 =~ m/gz$/ && $R2 =~ m/gz$/) { 
+		open READ1,"pigz -cd $R1 |" or die "$!"; 
+		open READ2,"pigz -cd $R2 |" or die "$!"; 
+	} else { 
+		open READ1,"lbzip2 -cd $R1 |" or die "$!"; 
+		open READ2,"lbzip2 -cd $R2 |" or die "$!";
+	}
+
 	my $nr = 1; 
   my ($rname,$bc,$umi,$seq,$qual) = ('') x 5;
+	my ($passed,$discarded) = (0) x 2; 
 	
-	while (<R1>) {
+	while (<READ1>) {
 		my $r1 = $_; 
 		chomp $r1;
-		my $r2 = <R2>;
+		my $r2 = <READ2>;
 		chomp $r2;
 		#print STDERR "Line number $nr, r1 = $r1, r2 = $r2\n";
 
@@ -59,19 +76,28 @@ if (-d $dir."/output" && -e $dir."/Log.final.out" && -e $dir."/Unmapped.out.mate
 			my $len = length $r1; 
 			my $bclen = ($len > 24) ? 16 : 14; 
 			my $umilen = ($len > 28) ? 10 : $len - $bclen;         ## it's 10 for 5' PE, 10 for 3' v1(24-14) or v2(26-16), and 12 for 3'v3 (28-16)
+			print STDERR "WARNING: UMI length is not equal to 10 or 12!\n" if ($umilen != 10 && $umilen != 12); 
 			$bc = substr $r1,0,$bclen; 
 			$umi = substr $r1,$bclen,$umilen;
 			$seq = $r2;
 		} elsif ($nr % 4 == 0) { 
 			$qual = $r2;
-			printf "%s_%s_%s\n%s\n+\n%s\n",$rname,$bc,$umi,$seq,$qual;
+			if ($seq !~ m/A{50}/ && $seq !~ m/C{50}/ && $seq !~ m/T{50}/ && $seq !~ m/G{50}/) { 
+			  printf "%s_%s_%s\n%s\n+\n%s\n",$rname,$bc,$umi,$seq,$qual;
+				$passed++; 
+			} else { 
+				$discarded++; 
+			}
 		} 
 		$nr++; 
 	}
-  close R1;
-  close R2;
+  close READ1;
+  close READ2;
+	print STDERR "Making UMI-tools formatted reads: outputted $passed reads, discarded $discarded reads because of 50nt+ homopolymers ..\n"; 
 } else { 
-  ## here we assume the presence of a Cell/Space Ranger/STARsolo-formatted BAM file: 
+	## TODO: add read counter, add homopolymer filter for Cell Ranger BAM input
+
+	## here we assume the presence of a Cell/Space Ranger/STARsolo-formatted BAM file: 
 	## single- or paired-end (meaning biological reads), with CR and UR set for all reads, and CB/UB for reads that mapped successfully
 	## we will take only unmapped reads (-f4), and only R2 for paired-end reads (-f128)
 	## since all the BAM files are named differently, we would need to do a little sing-and-a-dance first: 
