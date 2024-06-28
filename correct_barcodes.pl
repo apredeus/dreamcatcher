@@ -4,16 +4,18 @@ use strict;
 use warnings; 
 use Data::Dumper; 
 
-if (scalar @ARGV != 2 ) { 
-	print STDERR "Usage: ./correct_barcodes.pl <se_umi_filt.fastq> <barcode_correction.tsv>\n"; 
+if (scalar @ARGV != 3 ) { 
+	print STDERR "Usage: ./correct_barcodes.pl <se_umi_filt.fastq> <barcode_correction.tsv> <output fastq>\n"; 
 	exit 1; 
 } 
 
 my $fastq = shift @ARGV; 
 my $bc_tsv = shift @ARGV; 
+my $out = shift @ARGV; 
 
 open FASTQ,"<",$fastq or die "$!"; 
 open TSV,"<",$bc_tsv or die "$!"; 
+open OUT,">",$out or die "$!"; 
 
 my $FQ = {}; 
 my $BC = {}; 
@@ -50,10 +52,10 @@ while (<FASTQ>) {
 	if (m/^@.*_([A-Z]+)_([A-Z]+)/) {
 		my $bc = $1; 
 		if (defined $BC->{$bc} && $BC->{$bc} eq "exact") { 
-			print; 
+			print OUT; 
 			$exact++; 
 		} elsif (! defined $BC->{$bc}) { 
-			print; 
+			print OUT; 
 			$unmatched++; 
 		} else { 
 			my $corr = @{$BC->{$bc}}[0];
@@ -70,15 +72,16 @@ while (<FASTQ>) {
 				}
 			} 
 			s/_${bc}_/_${corr}_/;
-			print; 
+			print OUT; 
 			$corrected++;
 		}
 	} else { 
-		print; 
+		print OUT; 
 	}
 } 
 
-printf STDERR "Processed fastq file with %d total reads; %d matching a whitelist, %d corrected, and %d unable to correct!\n",$exact+$corrected+$unmatched,$exact,$corrected,$unmatched; 
+printf STDOUT "correct_barcodes.pl: processed fastq file with %d total reads; %d matching a whitelist, %d corrected, and %d unable to correct!\n",$exact+$corrected+$unmatched,$exact,$corrected,$unmatched; 
 
 close FASTQ; 
-close TSV; 
+close TSV;
+close OUT; 
