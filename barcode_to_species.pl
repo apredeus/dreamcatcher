@@ -32,7 +32,17 @@ while (<UMI>) {
 
 	$pf =~ s/,.*//g; ## reads split between 2 reads are reported by featureCounts like this: BI380_RS19515,BI380_RS19520
 	$pf =~ s/\d+$//g;
-	my $sp = $PF->{$pf}; 
+
+    ## the following is just a stupid hack to a stupid problem (multiple prefixes per 1 annotation, eg ECs_/ECs_R)
+	my $sp; 
+	if (defined $PF->{$pf}) {
+	  $sp = $PF->{$pf};
+	} else { 
+	  foreach my $kpf (keys %{$PF}) { 
+	    $pf = $kpf if ($pf =~ m/^$kpf/); 
+	  }
+	  $sp = $PF->{$pf};
+	} 
 	if (! defined $BC->{$bc}->{$sp}) { 
 		$BC->{$bc}->{$sp} = $t[2]; 
 	}	else { 

@@ -151,7 +151,7 @@ close OUT;
 sub low_complexity {
   my $low_comp = 0; 
   ## identify low complexity sequences of few kinds:
-  ## (1) over 90% of the same letter overall;
+  ## (1) over 80% (changed from 90% because of empiric evidence!) of the same letter overall;
   ## (2) a run spanning 60%+ of the read of the most frequent letter with 1 mismatch allowed
   my $str = shift @_;
   chomp $str;
@@ -175,9 +175,9 @@ sub low_complexity {
     }
   }
 
-  ## now calculate fraction of the top letter & set low_comp to 1 if it's 90%+ 
+  ## now calculate fraction of the top letter & set low_comp to 1 if it's 80%+ 
   my $str_len = length $str;
-  $low_comp = 1 if ($top_count/$str_len >= 0.9);
+  $low_comp = 1 if ($top_count/$str_len >= 0.8);
 
   ## find longest substring of $top_ltr, allowing for 1 mismatch
   my $mismatch = 0;

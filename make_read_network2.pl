@@ -6,24 +6,24 @@ use strict;
 use warnings;
 
 if (scalar @ARGV != 2) { 
-  print STDERR "Usage: ./make_read_network.pl <read_to_gene_filtered_uniq> <annotated.fcounts.tsv>\n"; 
+  print STDERR "Usage: ./make_read_network2.pl <read_to_gene_filtered_uniq> <filtered_fcounts_tsv>\n"; 
   exit 1; 
 }
 
 my $read_to_gene = shift @ARGV;
-my $ann_fc = shift @ARGV; 
+my $filt_fc = shift @ARGV; 
 
 open READS,"<",$read_to_gene or die "$!"; 
-open ANNFC,"<",$ann_fc or die "$!"; 
+open FILTFC,"<",$filt_fc or die "$!"; 
 
 my $G2A = {};    ## gene-to-accession 
 my $N = {};      ## nodes
 my $E = {};      ## edges 
 
 #print STDOUT "make_read_network.pl: reading seq2taxid table..\n";
-while (<ANNFC>) {
+while (<FILTFC>) {
   my $gene = (split /\t/)[0]; 
-  my $gcf = (split /\t/)[8]; 
+  my $gcf = (split /\t/)[11]; 
   $G2A->{$gene} = $gcf; 
 } 
 
@@ -36,7 +36,19 @@ while (<READS>) {
   chomp; 
   my @t = split /\t/;
   my $curr_read = $t[0]; 
-  my $curr_gene = (split /,/,$t[1])[0]; ## if there are > 1 genes, first one is enough to find the associated GCF
+  my $curr_gene;
+  ## in rare cases, there would be multiple comma-separated genes the read mapped to, but only 1 would be in a filtered list
+  if ($t[1] =~ m/,/) { 
+    my @q = split /,/,$t[1];
+    foreach my $gene (@q) {
+      if (defined $G2A->{$gene}) {
+	    $curr_gene = $gene;
+	    last;
+	  }
+    } 
+  } else { 
+    $curr_gene = $t[1]; 
+  } 
 
   ## this is the simple trick to avoid putting everything into memory.
   if ($curr_read eq $prev_read) {
@@ -47,7 +59,7 @@ while (<READS>) {
   } else {
     my @read_gcfs;
     foreach my $gene (@read_genes) {
-      push @read_gcfs,$G2A->{$gene};
+      push @read_gcfs,$G2A->{$gene} if (defined $G2A->{$gene});
     }
 
     my @uniq_gcfs = uniq(@read_gcfs);
@@ -69,7 +81,7 @@ while (<READS>) {
 ## need extra thing for the last line of the file
 my @read_gcfs;
 foreach my $gene (@read_genes) {
-  push @read_gcfs,$G2A->{$gene};
+  push @read_gcfs,$G2A->{$gene} if (defined $G2A->{$gene});
 }
 
 ## only uniq strains (so strain1 will never be equal to strain2 below): 
@@ -93,7 +105,7 @@ foreach my $gcf1 (keys %{$E}) {
   } 
 } 
 
-close ANNFC;
+close FILTFC;
 close READS;
 
 sub uniq {
