@@ -13,14 +13,8 @@
 ########## (until we overhaul the whole thing to Singularity) ############
 ##########################################################################
 
-SOLODIR=$1
+FQDIR=$1
 TAG=$2
-
-if [[ $SOLODIR == "" || $TAG == "" ]]
-then 
-	>&2 echo "Usage: ./dreamcatcher.sh <starsolo/cellranger dir> <sample_id>"
-	exit 1
-fi
 
 CPUS=16
 NCBI=/nfs/cellgeni/NCBI_datasets/bacteria_ref/ncbi_dataset/data/
@@ -29,7 +23,7 @@ SEQ2TAXID=$KUDB/seqid2taxid.map.refseq
 GENBANK=$KUDB/assembly_summary_bacteria.txt
 GSA=$KUDB/gcf_species_genus.tsv
 FCDIR=/nfs/users/nfs_c/cellgeni-su/subread/bin/
-HST2T=/nfs/cellgeni/STAR/human/T2T/T2T_with_mito
+HST2T=/nfs/cellgeni/STAR/human/T2T/T2T_mito_phix
 
 mkdir $TAG
 cd $TAG
@@ -38,7 +32,7 @@ cp ../*.pl ../*.sh ../*.R .
 ## step 1: make single end fastq file specially formatted for UMI tools
 ## remove homopolymers and correct the barcodes too 
 echo "STEP 1: Making UMI-tools fomatted single-end fastq file .." 
-./make_umi_fastq2.pl $SOLODIR/$TAG se_umi_filt.fastq
+./make_umi_fastq.pl $SOLODIR/$TAG se_umi_filt.fastq
 ./get_barcode_corrections.sh $TAG $SOLODIR
 ./correct_barcodes.pl se_umi_filt.fastq barcodes_vs_whitelist.tsv se_umi_corr.fastq 
 pigz se_umi_corr.fastq
@@ -50,9 +44,9 @@ krakenuniq --threads $CPUS --db $KUDB --preload-size 120G --output kuniq.output.
 pigz kuniq.output.txt
 
 if (( `cat kuniq.report.txt | wc -l` < 10 ))
-then 
-	>&2 echo "ERROR: STEP 2 (KrakenUniq) has produced an empty report file! Exiting .." 
-	exit 1
+then
+  >&2 echo "ERROR: STEP 2 (KrakenUniq) has produced an empty report file! Exiting .." 
+  exit 1
 fi
 ## step 3: find all RefSeq accessions 
 ## new script will extract all "precise" matches, and will only keep 1 (representative/reference) genome when many GCFs map to 1 taxid
@@ -79,7 +73,7 @@ hisat2 -t -p$CPUS -k 1 --max-seeds 1000 --sp 1,1 --no-unal -U se_umi_corr.fastq.
 ### step 8: featureCounts it. Multimappers count for 1/N-th of a read. featureCounts compiled in a special way
 echo "STEP 8: Running featureCounts with accurate multimapper counting; annotate each read with gene, and number of bacterial and human mismatches .." 
 $FCDIR/featureCounts -T $CPUS -M -O --fraction -t gene -g locus_tag -s 0 -a combined_bacterial.gff -o fcounts.tsv -R BAM combined_bacterial.bam &> combined_bacterial.fcounts.log  
-./annotate_mapped_reads2.pl combined_bacterial.bam.featureCounts.bam human_remap.bam > combined_bacterial_reads_annotated.tsv
+./annotate_mapped_reads.pl combined_bacterial.bam.featureCounts.bam human_remap.bam > combined_bacterial_reads_annotated.tsv
 
 ### step 9: make a big table of gene biotypes; iterative regex accounts for somewhat complex range of cases that happen in GFF
 echo "STEP 9: Making a gene biotype table .." 
@@ -106,26 +100,36 @@ fi
 echo "STEP 11: Make the network file using the overlapping reads .." 
 grep  -F -f filtered.gene.list combined_bacterial_reads_annotated.tsv | cut -f1,2 | sort -S 50% --parallel=$CPUS  | uniq > read_to_gene_filtered_uniq.tsv
 grep  -F -f filtered.gene.list annotated.fcounts.tsv > filtered.fcounts.tsv
-./make_read_network2.pl read_to_gene_filtered_uniq.tsv filtered.fcounts.tsv > nodes_and_edges.tsv
+./make_read_network.pl read_to_gene_filtered_uniq.tsv filtered.fcounts.tsv > nodes_and_edges.tsv
+
+./annotate_filtered_reads.pl annotated.fcounts.tsv read_to_gene_filtered_uniq.tsv > read_filtered_type_strain.tsv
+cut -f1,4 read_filtered_type_strain.tsv | sort -S 50% --parallel=$CPUS | uniq | cut -f1 | uniq -c | awk '{print $2"\t"$1}' > reads_by_uniqness.tsv
+awk '$2 == 1' reads_by_uniqness.tsv | cut -f1 | sort > unique_filt_reads.list &
+awk '$2 >  1' reads_by_uniqness.tsv | cut -f1 | sort > multi_filt_reads.list  & 
+wait
+
+grep -wF -f unique_filt_reads.list read_filtered_type_strain.tsv | awk '$3 == "rRNA"' | cut -f1,4 | sort | uniq | cut -f2 | sort | uniq -c | awk '{print $2"\t"$1}' > rRNA.uniq_counts.tsv &
+grep -wF -f unique_filt_reads.list read_filtered_type_strain.tsv | awk '$3 != "rRNA"' | cut -f1,4 | sort | uniq | cut -f2 | sort | uniq -c | awk '{print $2"\t"$1}' > protein.uniq_counts.tsv &
+grep -wF -f multi_filt_reads.list  read_filtered_type_strain.tsv | awk '$3 == "rRNA"' | cut -f1,2 | sort | uniq > rRNA.shared_reads.tsv & 
+grep -wF -f multi_filt_reads.list  read_filtered_type_strain.tsv | awk '$3 != "rRNA"' | cut -f1,2 | sort | uniq > protein.shared_reads.tsv & 
+wait
+
+./make_read_network.pl rRNA.shared_reads.tsv filtered.fcounts.tsv > rRNA.nodes_and_edges.tsv &
+./make_read_network.pl protein.shared_reads.tsv filtered.fcounts.tsv > protein.nodes_and_edges.tsv &
+wait
 
 echo "STEP 12: Parse the network and get the definitive list of strains .." 
-./parse_read_network2.R filtered.summary.tsv nodes_and_edges.tsv $GSA 0.6 &> parse_read_network.log
-
-echo "STEP 12X: Remove reads that map to blacklisted genes and human stuff .." 
-grep -F -f blacklisted_genes.list combined_bacterial_reads_annotated.tsv | cut -f1 | sort | uniq > blacklisted_read.list & 
-awk '$4 != "-" && $4 <= $3' combined_bacterial_reads_annotated.tsv | cut -f 1 | sort | uniq > human_read.list & 
-wait 
-cat blacklisted_read.list human_read.list | sort | uniq > reads_to_remove.list 
-filterbyname.sh in=se_umi_corr.fastq.gz names=reads_to_remove.list out=se_umi_clean.fastq.gz ow=t &> read_clean.log 
+./parse_read_network.R &> parse_read_network.log
+sort -u -t$'\t' -k15,15 --merge filtered.cluster.tsv > top.cluster.tsv
 
 echo "STEP 13: Making the new small bacterial reference, and mapping corrected reads to it .."
-cut -f1 top_strains.tsv | grep -v RefSeq > top.acc.list
+cut -f1 top.cluster.tsv | grep -v RefSeq > top.acc.list
 ./make_combined_reference.sh $NCBI top.acc.list top_bacterial &> mkref_top.log 
 hisat2-build top_bacterial.fna top_bacterial &> hisat2_build_top.log 
 hisat2 -p$CPUS -k 100 --sp 1,1 --no-spliced-alignment --no-unal -U se_umi_clean.fastq.gz -x top_bacterial 2> hisat2_top.log | samtools sort -@$CPUS --verbosity 0 -O BAM - > top_bacterial.bam
 
 echo "STEP 14: Generate a new BAM file with reads assigned to genes using featureCounts .."
-## 1) no strand specificity for now; 2) -M -O but without splitting - no point (UMIs will count later) 
+# 1) no strand specificity for now; 2) -M -O but without splitting - no point (UMIs will count later) 
 $FCDIR/featureCounts -T $CPUS -a top_bacterial.gff -t gene -g locus_tag -M -O -o gene_assigned -R BAM top_bacterial.bam &> top_bacterial.fcounts.log
 samtools sort -@$CPUS top_bacterial.bam.featureCounts.bam > top_assigned_sorted.bam
 rm top_bacterial.bam.featureCounts.bam
