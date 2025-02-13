@@ -2,7 +2,6 @@
 
 use strict;
 use warnings; 
-use Data::Dumper; 
 
 if (scalar @ARGV != 3 ) { 
 	print STDERR "Usage: ./correct_barcodes.pl <se_umi_filt.fastq> <barcode_correction.tsv> <output fastq>\n"; 
@@ -80,7 +79,7 @@ while (<FASTQ>) {
 	}
 } 
 
-printf STDOUT "correct_barcodes.pl: processed fastq file with %d total reads; %d matching a whitelist, %d corrected, and %d unable to correct!\n",$exact+$corrected+$unmatched,$exact,$corrected,$unmatched; 
+printf STDOUT "\t\tcorrect_barcodes.pl: processed fastq file with %d total reads; %d matching a whitelist, %d corrected, and %d unable to correct!\n",$exact+$corrected+$unmatched,$exact,$corrected,$unmatched; 
 
 close FASTQ; 
 close TSV;
