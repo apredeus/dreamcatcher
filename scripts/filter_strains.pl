@@ -10,8 +10,8 @@ use strict;
 use warnings; 
 
 if (scalar @ARGV != 3) {
-  print STDERR "Usage: ./annotate_mapped_reads2.pl <accession_summary_tsv> <annotated_fcounts_tsv> <gene_blacklist>\n";
-  exit 1;
+	print STDERR "Usage: ./filter_strains.pl <accession_summary_tsv> <annotated_fcounts_tsv> <gene_blacklist>\n";
+	exit 1;
 }
 
 my $acc_summary = shift @ARGV; 
@@ -33,60 +33,60 @@ my $BLG = {}; ## blacklisted genes
 my $A2G = {}; ## gene properties, linked to assembly the gene belongs to
 
 while (<BLIST>) {
-  chomp; 
-  $BLG->{$_} = 1; 
+    chomp; 
+	$BLG->{$_} = 1; 
 } 
 
 while (<FCOUNTS>) {
-  my @t = split /\t/;
-  my $gene = $t[0]; 
-  my $acc = $t[11]; 
-  if (defined $A2G->{$acc}->{$gene}) { 
-    print STDERR "WARNING: multiple lines per gene in annotated.fcounts.tsv! This should not happen; please investigate."; 
-  } else {  
-    $A2G->{$acc}->{$gene}->{type} = $t[8]; 
-    $A2G->{$acc}->{$gene}->{mismatch} = $t[9]; 
-    $A2G->{$acc}->{$gene}->{human} = $t[10];
+	my @t = split /\t/;
+	my $gene = $t[0]; 
+	my $acc = $t[11]; 
+	if (defined $A2G->{$acc}->{$gene}) { 
+		print STDERR "\tfilter_strains.pl: WARNING: multiple lines per gene in annotated.fcounts.tsv! This should not happen; please investigate."; 
+	} else {  
+		$A2G->{$acc}->{$gene}->{type} = $t[8]; 
+		$A2G->{$acc}->{$gene}->{mismatch} = $t[9]; 
+		$A2G->{$acc}->{$gene}->{human} = $t[10];
 	$A2G->{$acc}->{$gene}->{blacklisted} = 1 if (defined $BLG->{$gene}); 
-  }
+	}
 } 
 
 while (<ACCSUM>) {
-  my $acc = (split /\t/)[0];
-  my $name = (split /\t/)[1];
-  my ($prot,$rrna,$mis,$hum,$blg) = ('0') x 5; 
-  foreach my $gene (keys %{$A2G->{$acc}}) { 
-    if (defined $A2G->{$acc}->{$gene}->{blacklisted}) { 
-	  $blg++; 
-	  next; 
+	my $acc = (split /\t/)[0];
+	my $name = (split /\t/)[1];
+	my ($prot,$rrna,$mis,$hum,$blg) = ('0') x 5; 
+	foreach my $gene (keys %{$A2G->{$acc}}) { 
+		if (defined $A2G->{$acc}->{$gene}->{blacklisted}) { 
+		$blg++; 
+		next; 
 	} elsif ($A2G->{$acc}->{$gene}->{human} > $human_fraction) { 
-	  $hum++; 
-	  next; 
+		$hum++; 
+		next; 
 	} elsif ($A2G->{$acc}->{$gene}->{type} eq "rRNA" && $A2G->{$acc}->{$gene}->{mismatch} > $mismatch_rrna_cutoff) { 
-	  $mis++;
-	  next; 
+		$mis++;
+		next; 
 	} elsif ($A2G->{$acc}->{$gene}->{type} ne "rRNA" && $A2G->{$acc}->{$gene}->{mismatch} > $mismatch_protein_cutoff) {
-	  $mis++;
-	  next; 
+		$mis++;
+		next; 
 	} elsif ($A2G->{$acc}->{$gene}->{type} eq "rRNA") { 
-	  $rrna++;
-	  $A2G->{$acc}->{$gene}->{filtered} = 1;  
-	  next; 
+		$rrna++;
+		$A2G->{$acc}->{$gene}->{filtered} = 1;  
+		next; 
 	} else { 
-	  $prot++;
-	  $A2G->{$acc}->{$gene}->{filtered} = 1;  
+		$prot++;
+		$A2G->{$acc}->{$gene}->{filtered} = 1;  
 	}
-  }
-  ## finally, filter the accession table!
-  if ($prot + $rrna >= 3) { 
-    print STDOUT "Strain $acc ($name) is RETAINED: $rrna rRNA and $prot non-rRNA genes detected; not considered: $blg blacklisted, $hum potentially human-derived, and $mis with too many mismatches.\n"; 
+	}
+	## finally, filter the accession table!
+	if ($prot + $rrna >= 3) { 
+		print STDOUT "Strain $acc ($name) is RETAINED: $rrna rRNA and $prot non-rRNA genes detected; not considered: $blg blacklisted, $hum potentially human-derived, and $mis with too many mismatches.\n"; 
 	print FSUM;
 	foreach my $gene (keys %{$A2G->{$acc}}) { 
-	  print FGENE "$gene\n" if (defined $A2G->{$acc}->{$gene}->{filtered});
+		print FGENE "$gene\n" if (defined $A2G->{$acc}->{$gene}->{filtered});
 	} 
-  } else {  
-    print STDOUT "Strain $acc ($name) is REMOVED: $rrna rRNA and $prot non-rRNA genes detected; not considered: $blg blacklisted, $hum potentially human-derived, and $mis with too many mismatches.\n"; 
-  } 
+	} else {  
+		print STDOUT "Strain $acc ($name) is REMOVED: $rrna rRNA and $prot non-rRNA genes detected; not considered: $blg blacklisted, $hum potentially human-derived, and $mis with too many mismatches.\n"; 
+	} 
 } 
 
 close ACCSUM; 

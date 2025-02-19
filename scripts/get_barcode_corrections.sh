@@ -16,7 +16,7 @@ echo -e "\t\tget_barcode_corrections.sh: generating a FASTA file from unique cel
 awk 'NR%4==1' $UNCORR | perl -ne '@t=split/_/; print "$t[-2]\n"' | sort | uniq | awk '{print ">"$1; print $1}' > barcodes_to_correct.fa
 
 WL=`grep "soloCBwhitelist" $SOLODIR/$SMP/Log.out  | grep RE-DEFINED | awk '{print $2}'`
-echo "\t\tget_barcode_corrections.sh: found whitelist $WL; making a fasta file .." 
+echo -e "\t\tget_barcode_corrections.sh: found whitelist $WL; making a fasta file .." 
 cat $WL | awk '{print ">"$1; print $1}' > whitelist.fa
 bowtie2-build whitelist.fa whitelist &> /dev/null 
 

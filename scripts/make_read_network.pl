@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 if (scalar @ARGV != 2) { 
-  print STDERR "Usage: ./make_read_network2.pl <read_to_gene_filtered_uniq> <filtered_fcounts_tsv>\n"; 
+  print STDERR "Usage: ./make_read_network.pl <read_to_gene_filtered_uniq> <filtered_fcounts_tsv>\n"; 
   exit 1; 
 }
 

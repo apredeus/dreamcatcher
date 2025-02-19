@@ -27,7 +27,7 @@ done
 
 for i in $KK
 do
-  GCF=`grep "^$i" annotated.fcounts.tsv | cut -f12 | uniq`
+  GCF=`grep "^$i" filtered.annotated_fcounts.tsv | cut -f12 | uniq`
   SPECIES=`grep $GCF top.cluster.tsv | cut -f11`
   echo -e "$i\t$SPECIES"
 done 

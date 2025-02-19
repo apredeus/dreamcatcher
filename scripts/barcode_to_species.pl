@@ -5,7 +5,7 @@ use warnings;
 
 if (scalar @ARGV != 2) { 
 	print STDERR "USAGE: ./barcode_to_species.pl <gzipped_umitools_counts> <prefix_to_species_tsv>\n"; 
-  exit 1; 
+	exit 1; 
 } 
 
 my $umi_out = shift @ARGV; 
@@ -33,15 +33,15 @@ while (<UMI>) {
 	$pf =~ s/,.*//g; ## reads split between 2 reads are reported by featureCounts like this: BI380_RS19515,BI380_RS19520
 	$pf =~ s/\d+$//g;
 
-    ## the following is just a stupid hack to a stupid problem (multiple prefixes per 1 annotation, eg ECs_/ECs_R)
+	## the following is just a stupid hack to a stupid problem (multiple prefixes per 1 annotation, eg ECs_/ECs_R)
 	my $sp; 
 	if (defined $PF->{$pf}) {
-	  $sp = $PF->{$pf};
+		$sp = $PF->{$pf};
 	} else { 
-	  foreach my $kpf (keys %{$PF}) { 
-	    $pf = $kpf if ($pf =~ m/^$kpf/); 
-	  }
-	  $sp = $PF->{$pf};
+		foreach my $kpf (keys %{$PF}) { 
+			$pf = $kpf if ($pf =~ m/^$kpf/); 
+		}
+		$sp = $PF->{$pf};
 	} 
 	if (! defined $BC->{$bc}->{$sp}) { 
 		$BC->{$bc}->{$sp} = $t[2]; 
