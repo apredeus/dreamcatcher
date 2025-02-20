@@ -70,12 +70,12 @@ PAIRED=false
 
 SIF="/nfs/cellgeni/singularity/images/dreamcatcher.sif"
 CMD="singularity run --bind /nfs,/lustre,/software $SIF"
-NCBI="/nfs/cellgeni/NCBI_datasets/bacteria_ref/ncbi_dataset/data/"
-KUDB="/nfs/cellgeni/Kraken/KrakenUniq_select"
+NCBI="/nfs/cellgeni/refdata_dreamcatcher/NCBI_datasets/bacteria_ref/ncbi_dataset/data/"
+KUDB="/nfs/cellgeni/refdata_dreamcatcher/KrakenUniq_select"
+HST2T="/nfs/cellgeni/refdata_dreamcatcher/decoy_reference/T2T_mito_phix_vecs"
 SEQ2TAXID="$KUDB/seqid2taxid.map.refseq"
 GENBANK="$KUDB/assembly_summary_bacteria.txt"
 GSA="$KUDB/gcf_species_genus.tsv"
-HST2T="/nfs/cellgeni/STAR/human/T2T/T2T_mito_phix"
 
 #########################################################################################
 ######################## Don't change things below this line ############################
@@ -240,7 +240,7 @@ then
     rm detected_strains.bam
     mv detected_strains.bam.featureCounts.bam detected_fcounts.bam 
   
-    $SDIR/annotate_detected_reads.pl detected_fcounts.bam human_remap.bam > reads_to_gene_detected_w_mismatches.tsv
+    $SDIR/annotate_detected_reads.pl detected_fcounts.bam human_remap.bam > read_to_gene_detected_w_mismatches.tsv
 else 
     echo "==> ["`date +%H:%M:%S`"] STEP 6: Mapping original unmapped reads to the combined reference using Hisat2 .." 
     $CMD hisat2 -t -p$CPUS -k 5000 --sp 1,1 --no-spliced-alignment --no-unal -1 Unmapped_filt.R1.fastq.gz -2 Unmapped_filt.R2.fastq.gz -x \
@@ -256,7 +256,7 @@ else
     rm detected_strains.bam
     mv detected_strains.bam.featureCounts.bam detected_fcounts.bam 
   
-    $SDIR/annotate_detected_reads.pl detected_fcounts.bam human_remap.bam > reads_to_gene_detected_w_mismatches.tsv
+    $SDIR/annotate_detected_reads.pl detected_fcounts.bam human_remap.bam > read_to_gene_detected_w_mismatches.tsv
 fi
 
 ### step 9: make a big table of gene biotypes; iterative regex accounts for somewhat complex range of cases that happen in GFF
@@ -265,7 +265,7 @@ $SDIR/extract_gene_biotypes.pl detected_strains.gff > gene_biotypes.tsv
 
 ## step 9: annotate the table and generate a summary per-species 
 echo "==> ["`date +%H:%M:%S`"] STEP 10: Filtering/annotating the featureCounts table and generating summary per RefSeq accession .." 
-$SDIR/make_summary_tables.pl detected.fcounts.tsv gene_biotypes.tsv reads_to_gene_detected_w_mismatches.tsv $SEQ2TAXID
+$SDIR/make_summary_tables.pl detected.fcounts.tsv gene_biotypes.tsv read_to_gene_detected_w_mismatches.tsv $SEQ2TAXID
 
 ### step 10: filter the annotated table based on the number of rRNA and non-rRNA genes. files filtered.summary.tsv and filtered.gene.list would be generated
 echo "==> ["`date +%H:%M:%S`"] STEP 10: Filtering the accessions: keeping strains that pass our filtering criteria.." 
@@ -280,28 +280,16 @@ fi
 
 ### step 11: make the network file. use fast sort. note that we ONLY use the filtered genes to estimate the overlap etc
 echo "==> ["`date +%H:%M:%S`"] STEP 11: Make the network file using the overlapping reads .." 
-grep  -F -f filtered.gene.list reads_to_gene_detected_w_mismatches.tsv | cut -f1,2 | sort -S 50% --parallel=$CPUS  | uniq > read_to_gene_filtered_uniq.tsv
-grep  -F -f filtered.gene.list detected.annotated_fcounts.tsv > filtered.annotated_fcounts.tsv
-$SDIR/make_read_network.pl read_to_gene_filtered_uniq.tsv filtered.annotated_fcounts.tsv > nodes_and_edges.tsv
 
-$SDIR/annotate_filtered_reads.pl filtered.annotated_fcounts.tsv read_to_gene_filtered_uniq.tsv > read_filtered_type_strain.tsv
-cut -f1,4 read_filtered_type_strain.tsv | sort -S 50% --parallel=$CPUS | uniq | cut -f1 | uniq -c | awk '{print $2"\t"$1}' > reads_by_uniqness.tsv
-awk '$2 == 1' reads_by_uniqness.tsv | cut -f1 | sort > unique_filt_reads.list &
-awk '$2 >  1' reads_by_uniqness.tsv | cut -f1 | sort > multi_filt_reads.list  & 
-wait
+$SDIR/get_shared_uniq_reads.sh $CPUS 
 
-grep -wF -f unique_filt_reads.list read_filtered_type_strain.tsv | awk '$3 == "rRNA"' | cut -f1,4 | sort | uniq | cut -f2 | sort | uniq -c | awk '{print $2"\t"$1}' > rRNA.uniq_counts.tsv &
-grep -wF -f unique_filt_reads.list read_filtered_type_strain.tsv | awk '$3 != "rRNA"' | cut -f1,4 | sort | uniq | cut -f2 | sort | uniq -c | awk '{print $2"\t"$1}' > protein.uniq_counts.tsv &
-grep -wF -f multi_filt_reads.list  read_filtered_type_strain.tsv | awk '$3 == "rRNA"' | cut -f1,2 | sort | uniq > rRNA.shared_reads.tsv & 
-grep -wF -f multi_filt_reads.list  read_filtered_type_strain.tsv | awk '$3 != "rRNA"' | cut -f1,2 | sort | uniq > protein.shared_reads.tsv & 
-wait
-
+$SDIR/make_read_network.pl read_to_gene_filtered_uniq.tsv filtered.annotated_fcounts.tsv > nodes_and_edges.tsv &
 $SDIR/make_read_network.pl rRNA.shared_reads.tsv filtered.annotated_fcounts.tsv > rRNA.nodes_and_edges.tsv &
 $SDIR/make_read_network.pl protein.shared_reads.tsv filtered.annotated_fcounts.tsv > protein.nodes_and_edges.tsv &
 wait
 
 echo "==> ["`date +%H:%M:%S`"] STEP 12: Parse the network and get the definitive list of strains .." 
-$CMD Rscript $SDIR/parse_read_network.R &> parse_read_network.log
+$CMD Rscript $SDIR/parse_read_network.R $GSA &> parse_read_network.log
 sort -u -t$'\t' -k15,15 --merge filtered.cluster.tsv > top.cluster.tsv
 
 if [[ $BULK == true ]]
@@ -319,9 +307,10 @@ $CMD hisat2 -p$CPUS -k 100 --sp 1,1 --no-spliced-alignment --no-unal -U Unmapped
 
 echo "==> ["`date +%H:%M:%S`"] STEP 14: Generate a new BAM file with reads assigned to genes using featureCounts .."
 # 1) no strand specificity for now; 2) -M -O but without splitting - no point (UMIs will count later) 
-$CMD featureCounts -T $CPUS -a top_strains.gff -t gene -g locus_tag -M -O -o gene_assigned -R BAM top_strains.bam &> top.fcounts.log
+$CMD featureCounts -T $CPUS -a top_strains.gff -t gene -g locus_tag -M -O -o top.fcounts.tsv -R BAM top_strains.bam &> top.fcounts.log
 $CMD samtools sort -@$CPUS top_strains.bam.featureCounts.bam > top_assigned_sorted.bam 2> /dev/null
 $CMD samtools index top_assigned_sorted.bam
+rm top_strains.bam top_strains.bam.featureCounts.bam
 
 echo "==> ["`date +%H:%M:%S`"] STEP 15: Running final quantification using UMI-tools .."
 $CMD umi_tools count --per-gene --gene-tag=XT --assigned-status-tag=XS --per-cell -I top_assigned_sorted.bam -S bac_umi_counts.tsv.gz &> umi_tools_count.log 
@@ -330,7 +319,7 @@ echo "==> ["`date +%H:%M:%S`"] STEP 16: Generate barcode-to-species table from p
 $SDIR/make_prefix_table.sh > prefix_to_species.tsv
 $SDIR/barcode_to_species.pl bac_umi_counts.tsv.gz prefix_to_species.tsv > barcode_to_species.tsv
 
-#echo "==> ["`date +%H:%M:%S`"] STEP 17: Tidy up the output directories .." 
-#$SDIR/organise_output_dir.sh
+echo "==> ["`date +%H:%M:%S`"] STEP 17: Tidy up the output directories .." 
+$SDIR/organise_output_dir.sh $BULK 
 
 echo "ALL DREAMCATCHER PROCESSING IS DONE! ENJOY!!!" 
