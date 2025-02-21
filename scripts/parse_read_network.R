@@ -1,5 +1,12 @@
 #!/usr/bin/env Rscript
 
+args = commandArgs(trailingOnly=TRUE)
+
+if (length(args) != 1) {
+  cat(sprintf("Usage: ./parse_read_network.R <gcf_species_genus.tsv>\n"))
+  quit(status=1)
+}
+
 library(igraph)
 library(dplyr)
 
@@ -17,9 +24,7 @@ library(dplyr)
 
 ### first let's make the big metadata table, 1 row = 1 filtered strain
 
-gsa_tsv <- "/nfs/cellgeni/Kraken/KrakenUniq_select/gcf_species_genus.tsv"
-
-gsa        <- try(read.csv(gsa_tsv, sep='\t', header=F, quote='', comment.char='', row.names=1))
+gsa        <- try(read.csv(args[1], sep='\t', header=F, quote='', comment.char='', row.names=1))
 filt_all   <- try(read.csv("filtered.summary.tsv", sep='\t', header=F, quote='', comment.char=''))
 uniq_rrna  <- try(read.table("rRNA.uniq_counts.tsv", sep='\t'))         ## unique rRNA reads per strain
 uniq_prot  <- try(read.table("protein.uniq_counts.tsv", sep='\t'))      ## unique non-rRNA reads per strain
