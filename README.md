@@ -38,14 +38,21 @@ At the same time, careful case-by-case consideration of bacteria of interest has
 
 The output contains the following folders: 
 
-  - `0_read_preprocessing` - with read preprocessing logs and barcode corrections (if performed); 
+  - `0_preprocessed_reads` - with read preprocessing logs and barcode corrections (if performed); 
   - `1_krakenuniq` - the output of `krakenuniq` unmapped read classification; 
   - `2_detected_strains` - list of the detected strains, as well as `hisat2` indexes, BAM files, annotated `featureCounts` outputs, and per-read annotations;
-  - `3_filtered_strains` - list of the filtered strains, as well as per-read annotations; 
-  - `4_top_strains` - list of the top strains
-  - `5_single_cell` - results of `umi-tools` processing, in case of 10x single cell or Visium experiments. 
+  - `3_filtered_strains` - list of the filtered strains, as well as annotated per-gene and per-read outputs; 
+  - `4_read_networks` - all the files that are the input and the output of the read graph collapsing algorithm; 
+  - `5_top_strains` - list of the top strains, as well as `hisat2` indexes, BAM files, annotated `featureCounts` outputs; 
+  - `6_umitools` - results of `umi-tools` processing, in case of 10x single cell or Visium experiments. Not present if the tool was ran in the `--bulk` mode.  
 
-Most important files are also present in the root directory. 
+Most important output files are also present in the root directory:
+  
+  - `kuniq.report.txt` - KrakenUniq report file that contains metagenomic classification for all reads unmapped to host, and can be visualised using [Pavian](https://github.com/fbreitwieser/pavian); 
+  - `detected.annotated_fcounts.tsv`, `detected.summary.tsv` - per-gene and per-strain metrics for the detected strains, derived by mapping reads to a set of strains (`2_detected_strains/detected_strains.list`) with > 3 unique k-mers in KrakenUniq;  
+  - `filtered.annotated_fcounts.tsv`, `filtered.summary.tsv` - per-gene and per-strain metrics for the filtered strains. Details of the filtering process could be found in `3_filtered_strains/filter_strains.log`; 
+  - `filtered.cluster.tsv`, `top.cluster.tsv` - results of read network clustering (input and output strains); 
+  - `barcode_to_species.tsv` - corrected barcode by identified bacterial species matrix. Not present if the tool was ran in the `--bulk` mode.
 
 ## Reference preparation 
 

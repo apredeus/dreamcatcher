@@ -9,6 +9,7 @@ if (length(args) != 1) {
 
 library(igraph)
 library(dplyr)
+options("width"=240)
 
 ### update on the clustering vNNN:
 ##  - select all of the good strains - uniq_prot > 0 and prot_genes > 2
@@ -136,8 +137,9 @@ if (is.null(shared_prot) | is.null(shared_rrna) | is.null(uniq_prot) | is.null(u
     if (dens >= 0.9 | length(lclust[[i]]) == 1) {
       ## if this is a ~clique, we treat it as 1 strain and are happy about it
       uniq_clust[[j]] <- lclust[[i]]
-      cat(sprintf("================== cluster %d/%d ::: %d components - %f density===================\n",i,j,nrow(ann),dens))
+      cat(sprintf("========================== cluster %d/%d ::: %d components - %f density ==========================\n",i,j,nrow(ann),dens))
       print(ann)
+      cat(sprintf("\n"))
       for (genus in unique(ann$Genus)) { 
         g2c[[genus]] <- j
       }
@@ -150,8 +152,9 @@ if (is.null(shared_prot) | is.null(shared_rrna) | is.null(uniq_prot) | is.null(u
         uniq_clust[[j]] <- subann$RefSeq
         g2c[[genus]] <- j
         j <- j + 1
-        cat(sprintf("================== SUBcluster %d/%d ::: %d components - %f density===================\n",i,j,nrow(subann),dens))
+        cat(sprintf("\t========================== SUBcluster %d/%d ::: %d components - %f density ==========================\n",i,j,nrow(subann),dens))
         print(subann)
+        cat(sprintf("\n"))
       }
     }
   }
@@ -180,80 +183,87 @@ if (is.null(shared_prot) | is.null(shared_rrna) | is.null(uniq_prot) | is.null(u
   ## now let's try to collapse the blurry clusters onto the uniq ones
   ## this happens in 2 cases: 1) if the subgraph made is perfect; 
   ## 2) if the "centroid" (top score) strain matches uniq one very well (>=0.9 overlap from nodes_and_edges.tsv)
+  ## it is also (rarely) happens that blurry clust is empty after merging into unique; account for this with the following if: 
   
-  b2u <- vector(mode = "list", length(blurry_clust)) ## trick to make a list of NULLs of defined size
-  
-  for (k in 1:length(blurry_clust)) {
-    clique_ovsum <- 0
-    clique_clust <- 0 ##finish here
-    best_overlap <- 0
-    best_weight  <- 0
-    best_clust   <- 0
-    for (j in 1:length(uniq_clust)) {
-      strains <- c(uniq_clust[[j]], blurry_clust[[k]])
-      sub1 <- induced_subgraph(net_all, uniq_clust[[j]])
-      sub2 <- induced_subgraph(net_all, blurry_clust[[k]]) 
-      sub3 <- induced_subgraph(net_all, strains)
-      ## count new connections and calculate % of maximum which is n1*n2
-      nv1 <- vcount(sub1)
-      nv2 <- vcount(sub2)
-      ne1 <- ecount(sub1)
-      ne2 <- ecount(sub2)
-      ne3 <- ecount(sub3)
-      ediff <- ne3 - ne1 - ne2
-      newconn <- ediff/(nv1*nv2)
-      ## calculate sum of all new overlaps
-      ovsum <- sum(E(sub3)$overlap) - sum(E(sub2)$overlap) - sum(E(sub1)$overlap)
-      
-      top1 <- strain_ann[strain_ann$RefSeq %in% blurry_clust[[k]], ]
-      top1 <- top1[order(-top1$score), ][1,1]
-      top2 <- strain_ann[strain_ann$RefSeq %in% uniq_clust[[j]], ]
-      top2 <- top2[order(-top2$score), ][1,1]
-      
-      edge12 <- try(E(net_all, P = c(top1, top2)), silent=T)
-      if (grepl("Error", edge12)) { 
-        edge12 <- NULL 
-      }
-      
-      if (newconn >= 0.9 & ovsum > clique_ovsum) {
-        cat(sprintf("Clusters: %d blurry, %d uniq, overlap: %d, max: %d\n",k,j,ovsum,clique_ovsum))
-        clique_ovsum <- ovsum
-        clique_clust <- j
-      } else if (! is.null(edge12)) { 
-        if (edge12$weight > 0.9 & edge12$overlap > best_overlap) {
-          best_overlap <- edge12$overlap
-          best_weight <- edge12$weight
-          best_clust <- j
+  if (length(blurry_clust) > 0) {
+    b2u <- vector(mode = "list", length(blurry_clust)) ## trick to make a list of NULLs of defined size
+    
+    for (k in 1:length(blurry_clust)) {
+      clique_ovsum <- 0
+      clique_clust <- 0 ##finish here
+      best_overlap <- 0
+      best_weight  <- 0
+      best_clust   <- 0
+      for (j in 1:length(uniq_clust)) {
+        strains <- c(uniq_clust[[j]], blurry_clust[[k]])
+        sub1 <- induced_subgraph(net_all, uniq_clust[[j]])
+        sub2 <- induced_subgraph(net_all, blurry_clust[[k]]) 
+        sub3 <- induced_subgraph(net_all, strains)
+        ## count new connections and calculate % of maximum which is n1*n2
+        nv1 <- vcount(sub1)
+        nv2 <- vcount(sub2)
+        ne1 <- ecount(sub1)
+        ne2 <- ecount(sub2)
+        ne3 <- ecount(sub3)
+        ediff <- ne3 - ne1 - ne2
+        newconn <- ediff/(nv1*nv2)
+        ## calculate sum of all new overlaps
+        ovsum <- sum(E(sub3)$overlap) - sum(E(sub2)$overlap) - sum(E(sub1)$overlap)
+        
+        top1 <- strain_ann[strain_ann$RefSeq %in% blurry_clust[[k]], ]
+        top1 <- top1[order(-top1$score), ][1,1]
+        top2 <- strain_ann[strain_ann$RefSeq %in% uniq_clust[[j]], ]
+        top2 <- top2[order(-top2$score), ][1,1]
+        
+        edge12 <- try(E(net_all, P = c(top1, top2)), silent=T)
+        if (grepl("Error", edge12)) { 
+          edge12 <- NULL 
         }
-      } 
+        
+        if (newconn >= 0.9 & ovsum > clique_ovsum) {
+          cat(sprintf("Clusters: %d blurry, %d uniq, overlap: %d, max: %d\n",k,j,ovsum,clique_ovsum))
+          clique_ovsum <- ovsum
+          clique_clust <- j
+        } else if (! is.null(edge12)) { 
+          if (edge12$weight > 0.9 & edge12$overlap > best_overlap) {
+            best_overlap <- edge12$overlap
+            best_weight <- edge12$weight
+            best_clust <- j
+          }
+        } 
+      }
+      if (clique_clust != 0) {
+        b2u[[k]] <- clique_clust
+        cat(sprintf("COLLAPSED as a ~fully connected subnetwork: %d blurry, %d uniq, %d overlap\n",k,clique_clust,clique_ovsum))
+      } else if (best_clust != 0) {
+        ## second best option
+        b2u[[k]] <- best_clust
+        cat(sprintf("COLLAPSED by very similar best strains: %d blurry, %d uniq, %f weight, %d overlap\n",k,best_clust,best_weight,best_overlap))
+      }
     }
-    if (clique_clust != 0) {
-      b2u[[k]] <- clique_clust
-      cat(sprintf("COLLAPSED as a ~fully connected subnetwork: %d blurry, %d uniq, %d overlap\n",k,clique_clust,clique_ovsum))
-    } else if (best_clust != 0) {
-      ## second best option
-      b2u[[k]] <- best_clust
-      cat(sprintf("COLLAPSED by very similar best strains: %d blurry, %d uniq, %f weight, %d overlap\n",k,best_clust,best_weight,best_overlap))
-    }
-  }
-  
+  } 
+
   merged_clust <- uniq_clust
   i <- length(uniq_clust) + 1
-  for (k in 1:length(blurry_clust)) {
-    j <- b2u[[k]]
-    if (is.null(j)) { 
-      merged_clust[[i]] <- blurry_clust[[k]]
-      i <- i + 1
-    } else {
-      merged_clust[[j]] <- c(merged_clust[[j]], blurry_clust[[k]])
+  if (length(blurry_clust) > 0) {
+    for (k in 1:length(blurry_clust)) {
+      j <- b2u[[k]]
+      if (is.null(j)) { 
+        merged_clust[[i]] <- blurry_clust[[k]]
+        i <- i + 1
+      } else {
+        merged_clust[[j]] <- c(merged_clust[[j]], blurry_clust[[k]])
+      }
     }
   }
 }
 
 r2c <- list()  ## simple refseq ID to final cluster dict
+cat(sprintf("\n\n\nContents of  MERGED clusters for the final output:\n\n\n")) 
 for (i in 1:length(merged_clust)) {
-  cat(sprintf("======================= Merged cluster %d ====================\n",i))
+  cat(sprintf("================================================ >> Merged cluster %d << ================================================\n",i))
   print(strain_ann[strain_ann$RefSeq %in% merged_clust[[i]], ])
+  cat(sprintf("\n"))
   for (refseq in merged_clust[[i]]) {
     r2c[[refseq]] <- i
   }
@@ -262,4 +272,3 @@ for (i in 1:length(merged_clust)) {
 strain_ann$cluster <- as.numeric(lapply(strain_ann$RefSeq, function(x) r2c[[x]]))
 strain_ann <- strain_ann[order(strain_ann$cluster, -strain_ann$score, -strain_ann$shared_prot, -strain_ann$shared_rrna), ]
 write.table(strain_ann, "filtered.cluster.tsv", sep="\t", quote=F, row.names=F)
-

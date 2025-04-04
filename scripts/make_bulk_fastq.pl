@@ -18,7 +18,7 @@ my $cmd = $ENV{'CMD'};
 my $len_cutoff = 40; 
 
 if (-s $dir."/Log.final.out") { 
-    print STDOUT "\t\tmake_bulk_fastq.pl: sample is provided in the form of STAR output! Will attempt to find Unmapped.out.mate* files..\n";
+    print STDOUT "make_bulk_fastq.pl: sample is provided in the form of STAR output! Will attempt to find Unmapped.out.mate* files..\n";
    
     ## we store these reads archived so let's account for this  
     my $paired = 0;
@@ -27,16 +27,22 @@ if (-s $dir."/Log.final.out") {
     chomp $R1; 
     chomp $R2; 
     if ($R1 eq "") { 
-        print STDERR "\t\tmake_bulk_fastq.pl: WARNING: cannot find unmapped read files Unmapped.out.mate(1/2) in the STAR directory! Will try the BAM file ..";
+        print STDERR "make_bulk_fastq.pl: WARNING: cannot find unmapped read files Unmapped.out.mate(1/2) in the STAR directory! Will try the BAM file ..\n";
+        goto STARBAM; 
     } elsif ($R2 eq "") { 
-        print STDOUT "\t\tmake_bulk_fastq.pl: found unmapped reads in fastq format; sample was determined to be a bulk single-end experiment!\n";
+        print STDOUT "make_bulk_fastq.pl: found unmapped reads in fastq format; sample was determined to be a bulk single-end experiment!\n";
     } else { 
-        print STDOUT "\t\tmake_bulk_fastq.pl: found unmapped reads in fastq format; sample was determined to be a bulk paired-end experiment!\n";
+        print STDOUT "make_bulk_fastq.pl: found unmapped reads in fastq format; sample was determined to be a bulk paired-end experiment!\n";
         $paired = 1; 
     }
 
     if ($paired) { 
-        print STDOUT "\t\tmake_bulk_fastq.pl: using the following input files:\n\t\tR1 = $R1\n\t\tR2 = $R2\n";     
+        print STDOUT "make_bulk_fastq.pl: using the following input files:\n\tR1 = $R1\n\tR2 = $R2\n";     
+        my $star_log = $dir."/Log.final.out"; 
+        my $total_reads = `grep "Number of input reads" $star_log | awk '{print \$6}' | tr -d '\n'`; 
+        my $total_unmapped = `grep "Number of reads unmapped" $star_log | awk -F "|" '{print \$2}' | awk '{sum+=\$1} END {print sum}' | tr -d '\n'`; 
+        print STDOUT "make_bulk_fastq.pl: using STARsolo input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
+
         open OUT1,">","Unmapped_filt.R1.fastq" or die "$!"; 
         open OUT2,">","Unmapped_filt.R2.fastq" or die "$!"; 
         ## this occasionally stupid concoction reads 2 fastq files synchronously.
@@ -60,11 +66,9 @@ if (-s $dir."/Log.final.out") {
             my $r2 = <READ2>;
             chomp $r2;
             if ($nr % 4 == 1) {
-                $r1 =~ m/(.*?)\s/;      ## shortest string until space 
-                $rname1 = $1;
-                $r2 =~ m/(.*?)\s/; 
-                $rname2 = $1; 
-                print STDERR "\t\tmake_bulk_fastq.pl: WARNING - read names do not match: $rname1 =/= $rname2!\n" if ($rname1 ne $rname2);
+                $rname1 = (split /\s/,$r1)[0];
+                $rname2 = (split /\s/,$r2)[0];
+                print STDERR "make_bulk_fastq.pl: WARNING - read names do not match: $rname1 =/= $rname2!\n" if ($rname1 ne $rname2);
             } elsif ($nr % 4 == 2) { 
                 $len1 = length $r1; 
                 $len2 = length $r2; 
@@ -87,10 +91,15 @@ if (-s $dir."/Log.final.out") {
         close READ2;
         close OUT1; 
         close OUT2;
-        print STDOUT "\t\tmake_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1/2.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
+        print STDOUT "make_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1/2.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
     } else { 
         ## same but for single-end reads 
-        print STDOUT "\t\tmake_bulk_fastq.pl: using the following input files:\n\t\tR1 = $R1\n";     
+        print STDOUT "make_bulk_fastq.pl: using the following input files:\n\tR1 = $R1\n";     
+        my $star_log = $dir."/Log.final.out"; 
+        my $total_reads = `grep "Number of input reads" $star_log | awk '{print \$6}' | tr -d '\n'`; 
+        my $total_unmapped = `grep "Number of reads unmapped" $star_log | awk -F "|" '{print \$2}' | awk '{sum+=\$1} END {print sum}' | tr -d '\n'`; 
+        print STDOUT "make_bulk_fastq.pl: using STARsolo input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
+        
         open OUT1,">","Unmapped_filt.R1.fastq" or die "$!"; 
         if ($R1 =~ m/gz$/) { 
             open READ1,"$cmd pigz -cd $R1 |" or die "$!"; 
@@ -107,8 +116,7 @@ if (-s $dir."/Log.final.out") {
             my $r1 = $_; 
             chomp $r1;
             if ($nr % 4 == 1) {
-                $r1 =~ m/(.*?)\s/;      ## shortest string until space 
-                $rname1 = $1;
+                $rname1 = (split /\s/,$r1)[0];
             } elsif ($nr % 4 == 2) { 
                 $len1 = length $r1; 
                 $seq1 = $r1;
@@ -125,35 +133,43 @@ if (-s $dir."/Log.final.out") {
         }
         close READ1;
         close OUT1; 
-        print STDOUT "\t\tmake_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
+        print STDOUT "make_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
     } 
 } else {
     ## any type of BAM file that has unmapped reads in it will do. 
     ## we will take only unmapped reads (-f4) for single-end, and separate R1/R2 for paired-end (-f76=4+8+64/-f140=4+8+128)
     ## change the heuristics to find the right bam - this is just a guess based on my STAR output dirs..
+    STARBAM:
     my $bam = `find $dir/* | grep -iv transcriptome | grep \"\.bam\$\"`; 
     chomp $bam; 
     if (length $bam) { 
-        print STDOUT "\t\tmake_bulk_fastq.pl: sample is assumed to be bulk RNA-seq BAM with unmapped reads!..\n";
+        print STDOUT "make_bulk_fastq.pl: sample is assumed to be bulk RNA-seq BAM with unmapped reads!..\n";
     } else { 
-        print STDERR "\t\tmake_bulk_fastq.pl: ERROR - failed to find a BAM file in the directory provided! Exiting .. \n"; 
+        print STDERR "make_bulk_fastq.pl: ERROR - failed to find a BAM file in the directory provided! Exiting .. \n"; 
         exit 1; 
     }
-    print STDOUT "\t\tmake_bulk_fastq.pl: using the following input files: \n\t\tBAM = $bam\n";
+    print STDOUT "make_bulk_fastq.pl: using the following input files: \n\tBAM = $bam\n";
 
-    ## we need to check if the file was mapped as paired-end; this changes what R1 and R2 actually are.
-    ## if $paired == 1, flags 64/128 will be set (R1 will be trimmed for BC+UMI).  
-    my $preads = `$cmd samtools view -h $bam | head -10000 | $cmd samtools flagstat - | grep \"properly paired\" | cut -d' ' -f1`; 
+    ## we need to check if the file was mapped as paired-end; for bulk, this changes some stats and fastq extraction samtools command.
+    my $preads = `grep \"properly paired\" host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`; 
     my $paired = ($preads > 0) ? 1 : 0; 
     if ($paired) { 
-        print STDOUT "\t\tmake_bulk_fastq.pl: extracting unmapped paired-end reads from the BAM file!\n";
+        my $total_reads  = `grep "primary\$"      host.bam.flagstat | awk '{printf "%d",\$1/2+\$3/2}'`; 
+        my $total_mapped = `grep "primary mapped" host.bam.flagstat | awk '{printf "%d",\$1/2+\$3/2}'`;
+        my $total_unmapped = $total_reads - $total_mapped; 
+        print STDOUT "make_bulk_fastq.pl: using BAM input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
+        print STDOUT "make_bulk_fastq.pl: extracting unmapped paired-end reads from the BAM file!\n";
         system "$cmd samtools fastq -\@4 -f4 -1 Unmapped_unfilt.R1.fastq -2 Unmapped_unfilt.R2.fastq -s Unmapped_unfilt.S.fastq $bam"; 
     } else { 
-        print STDOUT "\t\tmake_bulk_fastq.pl: extracting unmapped single-end reads from the BAM file!\n";
+        my $total_reads  = `grep "primary\$"      host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`; 
+        my $total_mapped = `grep "primary mapped" host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`;
+        my $total_unmapped = $total_reads - $total_mapped; 
+        print STDOUT "make_umi_fastq.pl: using BAM input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
+        print STDOUT "make_bulk_fastq.pl: extracting unmapped single-end reads from the BAM file!\n";
         system "$cmd samtools fastq -\@4 -f4 -o Unmapped_unfilt.R1.fastq $bam"; 
     } 
     
-    ## now we do the same thing as with  
+    ## now we do the same thing as with the unmapped reads above (sync reading) 
     if ($paired) { 
         open OUT1,">","Unmapped_filt.R1.fastq" or die "$!"; 
         open OUT2,">","Unmapped_filt.R2.fastq" or die "$!"; 
@@ -169,11 +185,9 @@ if (-s $dir."/Log.final.out") {
             my $r2 = <READ2>;
             chomp $r2;
             if ($nr % 4 == 1) {
-                $r1 =~ m/(.*?)\s/;      ## shortest string until space 
-                $rname1 = $1;
-                $r2 =~ m/(.*?)\s/; 
-                $rname2 = $1; 
-                print STDERR "\t\tmake_bulk_fastq.pl: WARNING - read names do not match: $rname1 =/= $rname2!\n" if ($rname1 ne $rname2);
+                $rname1 = (split /\s/,$r1)[0];
+                $rname2 = (split /\s/,$r2)[0];
+                print STDERR "make_bulk_fastq.pl: WARNING - read names do not match: $rname1 =/= $rname2!\n" if ($rname1 ne $rname2);
             } elsif ($nr % 4 == 2) { 
                 $len1 = length $r1; 
                 $len2 = length $r2; 
@@ -196,7 +210,7 @@ if (-s $dir."/Log.final.out") {
         close READ2;
         close OUT1; 
         close OUT2;
-        print STDOUT "\t\tmake_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1/2.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
+        print STDOUT "make_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1/2.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
     } else { 
         ## same but for single-end reads 
         open OUT1,">","Unmapped_unfilt.R1.fastq" or die "$!"; 
@@ -209,8 +223,7 @@ if (-s $dir."/Log.final.out") {
             my $r1 = $_; 
             chomp $r1;
             if ($nr % 4 == 1) {
-                $r1 =~ m/(.*?)\s/;      ## shortest string until space 
-                $rname1 = $1;
+                $rname1 = (split /\s/,$r1)[0];
             } elsif ($nr % 4 == 2) { 
                 $len1 = length $r1; 
                 $seq1 = $r1;
@@ -227,7 +240,7 @@ if (-s $dir."/Log.final.out") {
         }
         close READ1;
         close OUT1; 
-        print STDOUT "\t\tmake_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
+        print STDOUT "make_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
     }
 }
 

@@ -17,8 +17,8 @@ my $cmd = $ENV{'CMD'};
 
 open OUT,">",$out or die "$!"; 
 
-if (-d $dir."/output" && -e $dir."/Log.final.out") { 
-	print STDOUT "\t\tmake_umi_fastq.pl: 10x sample is provided in the form of STARsolo output! Making a single-end, UMI-tools-formatted fastq file..\n";
+if (-s $dir."/Log.final.out") { 
+	print STDOUT "make_umi_fastq.pl: 10x sample is provided in the form of STARsolo output! Making a single-end, UMI-tools-formatted fastq file..\n";
 	
 	## we need to check if the file was mapped as paired-end; this changes what R1 and R2 actually are.
 	## if $paired == 1, mate1 contains the barcode + UMI; if $paired == 0, it's mate2.  
@@ -29,9 +29,9 @@ if (-d $dir."/output" && -e $dir."/Log.final.out") {
 	}
 	close LOG;
 	if ($paired) { 
-		print STDOUT "\t\tmake_umi_fastq.pl: sample was determined to be 5' 10x paired-end experiment!\n";
+		print STDOUT "make_umi_fastq.pl: sample was determined to be 5' 10x paired-end experiment!\n";
 	} else { 
-		print STDOUT "\t\tmake_umi_fastq.pl: sample was determined to be 3'/5' 10x single-end experiment!\n"; 
+		print STDOUT "make_umi_fastq.pl: sample was determined to be 3'/5' 10x single-end experiment!\n"; 
 	} 
 
 	## now do the processing. We keep only the BC+UMI part of the barcode read
@@ -47,12 +47,17 @@ if (-d $dir."/output" && -e $dir."/Log.final.out") {
 		$R1 = ($paired) ? $dir."/Unmapped.out.mate1" : $dir."/Unmapped.out.mate2"; 
 		$R2 = ($paired) ? $dir."/Unmapped.out.mate2" : $dir."/Unmapped.out.mate1";
 	} else { 
-		print STDERR "\t\tmake_umi_fastq.pl: cannot find unmapped read files Unmapped.out.mate(1/2) in the STARsolo directory! Exiting .."; 
+		print STDERR "make_umi_fastq.pl: cannot find unmapped read files Unmapped.out.mate(1/2) in the STARsolo directory! Exiting .."; 
 		exit 1; 
 	}
 
-  print STDOUT "\t\t\tmake_umi_fastq.pl: using the following input files:\n\t\tR1 = $R1\n\t\tR2 = $R2\n";     
-  ## this occasionally stupid concoction reads 2 fastq files synchronously.
+    print STDOUT "make_umi_fastq.pl: using the following input files:\n\tR1 = $R1\n\tR2 = $R2\n";
+    my $star_log = $dir."/Log.final.out"; 
+    my $total_reads = `grep "Number of input reads" $star_log | awk '{print \$6}' | tr -d '\n'`; 
+    my $total_unmapped = `grep "Number of reads unmapped" $star_log | awk -F "|" '{print \$2}' | awk '{sum+=\$1} END {print sum}' | tr -d '\n'`; 
+    print STDOUT "make_umi_fastq.pl: using STARsolo input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
+
+    ## this occasionally stupid concoction reads 2 fastq files synchronously.
 	if ($R1 =~ m/gz$/ && $R2 =~ m/gz$/) { 
 		open READ1,"$cmd pigz -cd $R1 |" or die "$!"; 
 		open READ2,"$cmd pigz -cd $R2 |" or die "$!"; 
@@ -75,16 +80,15 @@ if (-d $dir."/output" && -e $dir."/Log.final.out") {
 		chomp $r2;
 
 		if ($nr % 4 == 1) {
-		    $r1 =~ m/(.*?)\s/;                                     ## shortest string until space 
-		    $rname = $1;
-		    $r2 =~ m/(.*?)\s/; 
-		    my $rname2 = $1; 
-		    print STDERR "\t\tmake_umi_fastq.pl: WARNING - read names do not match: $rname =/= $rname2!\n" if ($rname ne $rname2);
+            ## we take take the read name before any space; also, R1/R2 names should match, but if they don't, we use R1
+            $rname = (split /\s/,$r1)[0];
+            my $rname2 = (split /\s/,$r2)[0];
+		    print STDERR "make_umi_fastq.pl: WARNING - read names do not match: $rname =/= $rname2!\n" if ($rname ne $rname2);
 		} elsif ($nr % 4 == 2) { 
 		    my $len = length $r1; 
 		    my $bclen = ($len > 24) ? 16 : 14; 
 		    my $umilen = ($len > 28) ? 10 : $len - $bclen;         ## it's 10 for 5' PE, 10 for 3' v1(24-14) or v2(26-16), and 12 for 3'v3 (28-16)
-		    print STDERR "\t\tmake_umi_fastq.pl: WARNING - UMI length is not equal to 10 or 12!\n" if ($umilen != 10 && $umilen != 12); 
+		    print STDERR "make_umi_fastq.pl: WARNING - UMI length is not equal to 10 or 12!\n" if ($umilen != 10 && $umilen != 12); 
 		    $bc = substr $r1,0,$bclen; 
 		    $umi = substr $r1,$bclen,$umilen;
 		    $seq = $r2;
@@ -101,7 +105,7 @@ if (-d $dir."/output" && -e $dir."/Log.final.out") {
 	}
 	close READ1;
 	close READ2;
-	print STDOUT "\t\tmake_umi_fastq.pl: making UMI-tools formatted reads: outputted $passed reads, discarded $discarded reads as low-complexity sequences..\n"; 
+	print STDOUT "make_umi_fastq.pl: making UMI-tools formatted reads: outputted $passed reads, discarded $discarded reads as low-complexity sequences..\n"; 
 } else { 
 	## here we assume the presence of a Cell/Space Ranger/STARsolo-formatted BAM file: 
 	## single- or paired-end (meaning biological reads), with CR and UR set for all reads, and CB/UB for reads that mapped successfully
@@ -110,21 +114,29 @@ if (-d $dir."/output" && -e $dir."/Log.final.out") {
 	my $bam = `find $dir/* | grep -iv atac | grep -v vdj | grep -v multi | grep \"\.bam\$\"`; 
 	chomp $bam; 
 	if (length $bam) { 
-		print STDOUT "\t\tmake_umi_fastq.pl: sample is assumed to be Cell/Space Ranger/STARsolo BAM! Making a single-end, UMI-tools-formatted fastq file..\n";
+		print STDOUT "make_umi_fastq.pl: sample is assumed to be Cell/Space Ranger/STARsolo BAM! Making a single-end, UMI-tools-formatted fastq file..\n";
 	} else { 
-		print STDERR "\t\tmake_umi_fastq.pl: ERROR - failed to find a BAM file in the directory provided! Exiting .. \n"; 
+		print STDERR "make_umi_fastq.pl: ERROR - failed to find a BAM file in the directory provided! Exiting .. \n"; 
 		exit 1; 
 	}
-	print STDOUT "\t\tmake_umi_fastq.pl: using the following input file: \n\t\t\tBAM = $bam\n";
-
-	## we need to check if the file was mapped as paired-end; this changes what R1 and R2 actually are.
+	print STDOUT "make_umi_fastq.pl: using the following input file: \n\tBAM = $bam\n";
+	
+    ## we need to check if the file was mapped as paired-end; this changes what R1 and R2 actually are.
 	## if $paired == 1, flags 64/128 will be set (R1 will be trimmed for BC+UMI).  
-	my $preads = `$cmd samtools view -h $bam | head -10000 | $cmd samtools flagstat - | grep \"properly paired\" | cut -d' ' -f1`; 
+	my $preads = `grep \"properly paired\" host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`; 
 	my $paired = ($preads > 0) ? 1 : 0; 
 	if ($paired) { 
-		print STDOUT "\t\tmake_umi_fastq.pl: sample was determined to be 5' 10x paired-end experiment!\n";
+		print STDOUT "make_umi_fastq.pl: sample was determined to be 5' 10x paired-end experiment!\n";
+        my $total_reads  = `grep "primary\$"      host.bam.flagstat | awk '{printf "%d",\$1/2+\$3/2}'`; 
+        my $total_mapped = `grep "primary mapped" host.bam.flagstat | awk '{printf "%d",\$1/2+\$3/2}'`;
+        my $total_unmapped = $total_reads - $total_mapped; 
+        print STDOUT "make_umi_fastq.pl: using BAM input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
 	} else { 
-		print STDOUT "\t\tmake_umi_fastq.pl: sample was determined to be 3'/5' 10x single-end experiment!\n"; 
+		print STDOUT "make_umi_fastq.pl: sample was determined to be 3'/5' 10x single-end experiment!\n"; 
+        my $total_reads  = `grep "primary\$"      host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`; 
+        my $total_mapped = `grep "primary mapped" host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`;
+        my $total_unmapped = $total_reads - $total_mapped; 
+        print STDOUT "make_umi_fastq.pl: using BAM input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
 	} 
 
 	## now do the processing. We keep only the BC+UMI part of the barcode read

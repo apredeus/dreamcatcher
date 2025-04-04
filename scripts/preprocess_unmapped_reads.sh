@@ -17,6 +17,16 @@ fi
 ## all 10x is converted to single-end, and BC+UMI sequences are added to the read name separated by _ (UMI-tools format) 
 ## singularity image $CMD and script dir $SDIR are exported to the $ENV in the master script 
 
+if [[ $BAM == true && $BULK == false ]]
+then
+    BAMFILE=`find $FQDIR/$TAG/* | grep -iv atac | grep -v vdj | grep -v multi | grep "\.bam$"`
+    $CMD samtools flagstat -@4 $BAMFILE > host.bam.flagstat
+elif [[ $BAM == true && $BULK == true ]]
+then
+    BAMFILE=`find $FQDIR/$TAG/* | grep -iv transcriptome | grep "\.bam$"`
+    $CMD samtools flagstat -@4 $BAMFILE > host.bam.flagstat
+fi
+
 if [[ $BULK == false ]]
 then 
     ## no PE reads for single-cell; in case of PE 10x, we only use the "big" read (R2), take BC+UMI from R1, and drop the rest of the read

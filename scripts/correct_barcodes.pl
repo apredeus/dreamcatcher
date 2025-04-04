@@ -79,7 +79,7 @@ while (<FASTQ>) {
 	}
 } 
 
-printf STDOUT "\t\tcorrect_barcodes.pl: processed fastq file with %d total reads; %d matching a whitelist, %d corrected, and %d unable to correct!\n",$exact+$corrected+$unmatched,$exact,$corrected,$unmatched; 
+printf STDOUT "correct_barcodes.pl: processed fastq file with %d total reads; %d matching a whitelist, %d corrected, and %d unable to correct!\n",$exact+$corrected+$unmatched,$exact,$corrected,$unmatched; 
 
 close FASTQ; 
 close TSV;

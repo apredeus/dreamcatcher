@@ -7,8 +7,8 @@
 use strict;
 use warnings;
 
-if (scalar @ARGV != 4) { 
-  print STDERR "Usage: ./make_summary_tables.pl <fcounts_tsv> <gene_type_tsv> <annotated_reads_tsv> <seq2taxid.map>\n"; 
+if (scalar @ARGV != 5) { 
+  print STDERR "Usage: ./make_summary_tables.pl <fcounts_tsv> <gene_type_tsv> <annotated_reads_tsv> <seq2taxid.map> <name_tag>\n"; 
   exit 1; 
 } 
 
@@ -16,27 +16,28 @@ my $fcounts_tsv = shift @ARGV;
 my $gene_type = shift @ARGV; 
 my $ann_reads = shift @ARGV; 
 my $seq2taxid = shift @ARGV; 
+my $name_tag = shift @ARGV; 
 
 open FCOUNTS,"<",$fcounts_tsv or die "$!"; 
 open TYPES,"<",$gene_type or die "$!"; 
 open READS,"<",$ann_reads or die "$!"; 
 open SEQ2TAXID,"<",$seq2taxid or die "$!"; 
 
-open ANNFC,">","detected.annotated_fcounts.tsv"; 
-open SUMMARY,">","detected.summary.tsv"; 
+open ANNFC,">",$name_tag.".annotated_fcounts.tsv"; 
+open SUMMARY,">",$name_tag.".summary.tsv"; 
 
 my $GENE = {}; 
 my $CHR2ACC = {};
 my $SUM = {}; 
 
-print STDOUT "\tmake_annotated_tables.pl: reading gene/gene_type relationship table..\n"; 
+print STDOUT "\tmake_summary_tables.pl: reading gene/gene_type relationship table..\n"; 
 while (<TYPES>) {
   chomp; 
   my @t = split /\t/; 
   $GENE->{$t[0]}->{type} = $t[1];
 }
 
-print STDOUT "\tmake_annotated_tables.pl: reading seq2taxid table..\n";
+print STDOUT "\tmake_summary_tables.pl: reading seq2taxid table..\n";
 while (<SEQ2TAXID>) {
   chomp;
   my @t = split /\t/;
@@ -46,7 +47,7 @@ while (<SEQ2TAXID>) {
   $CHR2ACC->{$t[0]}->{name} = $2; 
 } 
 
-print STDOUT "\tmake_annotated_tables.pl: reading read table, counting mismatches per gene..\n"; 
+print STDOUT "\tmake_summary_tables.pl: reading read table, counting mismatches per gene..\n"; 
 while (<READS>) { 
   chomp; 
   my @t = split /\t/;
@@ -75,7 +76,7 @@ while (<READS>) {
   } 
 } 
 	  
-print STDOUT "\tmake_annotated_tables.pl: annotating the featureCounts output..\n"; 
+print STDOUT "\tmake_summary_tables.pl: annotating the featureCounts output..\n"; 
 while (<FCOUNTS>) { 
   chomp;
   next if (m/^#/ || m/^Geneid/); 
@@ -84,7 +85,7 @@ while (<FCOUNTS>) {
   my $chr = $t[1];
   my $fc_count = $t[6]; 
   if ($chr =~ m/(.*?);/) {
-    print STDERR "\tmake_annotated_tables.pl: WARNING: multiple chromosomes ($chr) for gene $gene! Will split them and use the first ID.\n"; 
+    print STDERR "\tmake_summary_tables.pl: WARNING: multiple chromosomes ($chr) for gene $gene! Will split them and use the first ID.\n"; 
     $chr = $1;
   }
 
@@ -95,13 +96,13 @@ while (<FCOUNTS>) {
     $taxid = $CHR2ACC->{$chr}->{taxid}; 
     $name = $CHR2ACC->{$chr}->{name}; 
   } else { 
-    print STDERR "\tmake_annotated_tables.pl: WARNING: no accession/taxid/species defined for chromosome $chr! Reporting NONE.\n"; 
+    print STDERR "\tmake_summary_tables.pl: WARNING: no accession/taxid/species defined for chromosome $chr! Reporting NONE.\n"; 
   } 
   if (defined $GENE->{$gene}) { 
     $type = $GENE->{$gene}->{type};
 	$raw_count = (defined $GENE->{$gene}->{raw}) ? $GENE->{$gene}->{raw} : 0;
   } else { 
-    print STDERR "\tmake_annotated_tables.pl: WARNING: no type defined for gene $gene! Reporting NONE.\n"; 
+    print STDERR "\tmake_summary_tables.pl: WARNING: no type defined for gene $gene! Reporting NONE.\n"; 
   } 
   ## only print if read count > 0 
   if ($raw_count > 0) {

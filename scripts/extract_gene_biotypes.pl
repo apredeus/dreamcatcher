@@ -1,5 +1,7 @@
 #!/usr/bin/env perl 
 
+## we miss pseudogenes here. 99% sure it does not matter. 
+
 use strict; 
 use warnings; 
 
