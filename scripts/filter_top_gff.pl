@@ -23,7 +23,6 @@ my $CHR2ACC = {};
 my $removed = 0; 
 my $kept = 0; 
 
-print STDERR "\tfilter_top_gff.pl: reading seq2taxid table..\n";
 while (<SEQ2TAXID>) {
     chomp;
     my @t = split /\t/;
@@ -64,7 +63,7 @@ while (<GFF>) {
     }
 }
 
-print STDERR "\tfilter_top_gff.pl: kept $kept genes, removed $removed genes..\n"; 
+#print STDERR "\tfilter_top_gff.pl: kept $kept genes, removed $removed genes..\n"; 
 
 close GLIST;
 close SEQ2TAXID; 

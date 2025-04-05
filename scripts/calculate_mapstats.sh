@@ -72,8 +72,8 @@ then
     RF1=`$CMD samtools view -@$CPUS 2_detected_strains/detected_fcounts.bam | grep -wF -f 3_filtered_strains/filtered.chr.list | grep  -P "\tNH:i:1\t" | cut -f1 | sort | uniq | wc -l`
     RF2=`$CMD samtools view -@$CPUS 2_detected_strains/detected_fcounts.bam | grep -wF -f 3_filtered_strains/filtered.chr.list | grep -vP "\tNH:i:1\t" | cut -f1 | sort | uniq | wc -l`
     RF3=$((RF1+RF2)) 
-    RF4=`grep -vP "\trRNA\t" 3_filtered_strains/filtered.read_to_gene_uniq.tsv | cut -f1 | sort | uniq | wc -l`
-    RF5=`grep  -P "\trRNA\t" 3_filtered_strains/filtered.read_to_gene_uniq.tsv | cut -f1 | sort | uniq | wc -l`
+    RF4=`grep -vP "\trRNA\t" 3_filtered_strains/filtered.read_type_strain.tsv | cut -f1 | sort | uniq | wc -l`
+    RF5=`grep  -P "\trRNA\t" 3_filtered_strains/filtered.read_type_strain.tsv | cut -f1 | sort | uniq | wc -l`
     RF6=$((RF4+RF5))
 
     ## we mapped to top strains, so this is the same as for detected

@@ -30,14 +30,12 @@ my $GENE = {};
 my $CHR2ACC = {};
 my $SUM = {}; 
 
-print STDOUT "\tmake_summary_tables.pl: reading gene/gene_type relationship table..\n"; 
 while (<TYPES>) {
   chomp; 
   my @t = split /\t/; 
   $GENE->{$t[0]}->{type} = $t[1];
 }
 
-print STDOUT "\tmake_summary_tables.pl: reading seq2taxid table..\n";
 while (<SEQ2TAXID>) {
   chomp;
   my @t = split /\t/;
@@ -47,7 +45,6 @@ while (<SEQ2TAXID>) {
   $CHR2ACC->{$t[0]}->{name} = $2; 
 } 
 
-print STDOUT "\tmake_summary_tables.pl: reading read table, counting mismatches per gene..\n"; 
 while (<READS>) { 
   chomp; 
   my @t = split /\t/;
@@ -76,7 +73,6 @@ while (<READS>) {
   } 
 } 
 	  
-print STDOUT "\tmake_summary_tables.pl: annotating the featureCounts output..\n"; 
 while (<FCOUNTS>) { 
   chomp;
   next if (m/^#/ || m/^Geneid/); 

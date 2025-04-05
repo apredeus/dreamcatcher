@@ -39,17 +39,17 @@ then
   exit 1
 fi
 
-echo "=================================================================================="
-echo "=================================================================================="
-echo "===                                                                            ==="
-echo "===                        Welcome to Dreamcatcher!                            ==="
-echo "===           Version $VERSION - Singularity packaging, with bulk/PE support        ==="
-echo "===          2022-25 (c)  Alexander Predeus, Wellcome Sanger Institute         ==="
-echo "===  For more information, visit https://github.com/apredeus/dreamcatcher      ==="
-echo "===         Publication in preparation (I mean it this time).                  ==="
-echo "===                                                                            ==="
-echo "=================================================================================="
-echo "=================================================================================="
+echo "                                    =================================================================================="
+echo "                                    =================================================================================="
+echo "                                    ===                                                                            ==="
+echo "                                    ===                        Welcome to Dreamcatcher!                            ==="
+echo "                                    ===           Version $VERSION - Singularity packaging, with bulk/PE support        ==="
+echo "                                    ===          2022-25 (c)  Alexander Predeus, Wellcome Sanger Institute         ==="
+echo "                                    ===  For more information, visit https://github.com/apredeus/dreamcatcher      ==="
+echo "                                    ===         Publication in preparation (I mean it this time).                  ==="
+echo "                                    ===                                                                            ==="
+echo "                                    =================================================================================="
+echo "                                    =================================================================================="
 echo
 echo
 
@@ -298,7 +298,7 @@ then
 	    >&2 echo "ERROR: no strains have passed the filtering threshold at STEP 11! Cleaning up and exiting .." 
 
         echo "==> ["`date +%H:%M:%S`"] STEP 13: Tidy up the output directories .." 
-        $SDIR/organise_output_dir.sh $BULK 
+        $SDIR/organise_output_dir.sh $BULK $BAM 
         echo "==> ["`date +%H:%M:%S`"] STEP 14: Calculating the mapping stats .." 
         $SDIR/calculate_mapstats.sh $TAG $CPUS > mapstats.tsv
 	    
@@ -407,7 +407,7 @@ $SDIR/log_stat.sh top
 if [[ $BULK == true ]]
 then
     echo "==> ["`date +%H:%M:%S`"] STEP 23: Tidy up the output directories .." 
-    $SDIR/organise_output_dir.sh $BULK 
+    $SDIR/organise_output_dir.sh $BULK $BAM 
 
     echo "==> ["`date +%H:%M:%S`"] STEP 24: Calculating the mapping stats .." 
     $SDIR/calculate_mapstats.sh $TAG $CPUS > mapstats.tsv
@@ -424,7 +424,7 @@ else
 	$SDIR/log_stat.sh umi
     
     echo "==> ["`date +%H:%M:%S`"] STEP 25: Tidy up the output directories .." 
-    $SDIR/organise_output_dir.sh $BULK 
+    $SDIR/organise_output_dir.sh $BULK $BAM 
     
     echo "==> ["`date +%H:%M:%S`"] STEP 26: Calculating the mapping stats .." 
     $SDIR/calculate_mapstats.sh $TAG $CPUS > mapstats.tsv
