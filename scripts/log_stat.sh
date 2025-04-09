@@ -34,7 +34,7 @@ then
     ACA=`cut -f12 detected.annotated_fcounts.tsv | sort | uniq | wc -l` ## at least 1 gene detected
     FCD=`awk '{sum+=$7} END {printf "%d",sum}' detected.annotated_fcounts.tsv` ## approximate number of "useful" reads
     GD3=`cut -f1 detected.annotated_fcounts.tsv | wc -l` ## number of detected bacterial genes
-    echo -e "\tlog_stat.sh detected: $ACK accessions in KrakenUniq; $ACC detected strains, $ACA detected with at least 1 annotated gene"
+    echo -e "\tlog_stat.sh detected: $ACK accessions in KrakenUniq; $ACC detected strains (> 2 unique KrakenUniq k-mers), $ACA detected with reads mapped to least 1 annotated gene"
     echo -e "\tlog_stat.sh detected: out of $RFLT filtered reads unmapped to host, $RKUQ assigned to Bacteria superkingdom by KrakenUniq"
     echo -e "\tlog_stat.sh detected: $RD3 reads mapped by Hisat2 to all detected strains ($RD1 unique, $RD2 multi-mappers)"
     echo -e "\tlog_stat.sh detected: of these, approximately $FCD reads were assigned to $GD3 bacterial genes"
@@ -47,7 +47,7 @@ then
     NF2=`awk '$11 <= 0.1' detected.annotated_fcounts.tsv | awk '($9 == "rRNA" && $10 > 3.4) || ($9 != "rRNA" && $10 > 2.3)' | wc -l` 
     NF3=`awk '$11 <= 0.1' detected.annotated_fcounts.tsv | awk '($9 == "rRNA" && $10 <= 3.4) || ($9 != "rRNA" && $10 <= 2.3)' | grep -cf blacklisted_genes.list`
     echo -e "\tlog_stat.sh filtered: $ACF bacterial strains retained after filtering"
-    echo -e "\tlog_stat.sh filtered: $NF1 detected bacterial genes were putatively human, $NF2 had too many mismatches, and $NF3 belonged to the black list" 
+    echo -e "\tlog_stat.sh filtered: $NF1 detected bacterial genes were putatively human, $NF2 had too many mismatches, and $NF3 belonged to the blacklist" 
     echo -e "\tlog_stat.sh filtered: approximately $FCF reads were assigned to $GF3 filtered bacterial genes."
 elif [[ $FLAG == "top" ]]
 then
@@ -71,6 +71,6 @@ then
     echo -e "\tlog_stat.sh top: $GTU unique genes spanning $BCS unique barcodes were detected"
     echo -e "\tlog_stat.sh top: a total of $UMI bacterial UMIs detected in all droplets"
 else 
-    >&2 echo "log_stat.sh: ERROR: $FLAG is not a recognised flag!" 
+    >&2 echo "log_stat.sh: ERROR: \"$FLAG\" is not a recognised flag!" 
     exit 1
 fi 

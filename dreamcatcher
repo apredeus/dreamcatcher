@@ -174,7 +174,7 @@ echo "                         SAMPLE ID: $TAG"
 echo "                              CPUS: $CPUS"
 echo "                    MAXIMIM RAM(G): $RAM"
 echo "                         BULK MODE: $BULK"
-echo "   SKIP REMAP (start from step 12): $SKIPREMAP"
+echo "   SKIP REMAP (start from step 13): $SKIPREMAP"
 echo "                         BAM INPUT: $BAM"
 echo "                   SINGULARITY IMG: $SIF"
 echo "                   SINGULARITY CMD: $CMD"
@@ -302,6 +302,7 @@ then
         echo "==> ["`date +%H:%M:%S`"] STEP 14: Calculating the mapping stats .." 
         $SDIR/calculate_mapstats.sh $TAG $CPUS > mapstats.tsv
 	    
+        echo "ALL DREAMCATCHER PROCESSING IS DONE - 0 STRAINS PASSED FILTERING! BYE!!!"
         exit 1
     fi
 fi
