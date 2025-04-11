@@ -310,7 +310,7 @@ fi
 ### step 13: make the network file. use fast(er) sort, since files can be big. note that we ONLY use the filtered genes to estimate the overlap etc
 echo "==> ["`date +%H:%M:%S`"] STEP 13: Make the network file using the overlapping reads .." 
 
-$SDIR/get_shared_uniq_reads.sh $CPUS 
+$SDIR/get_shared_uniq_reads.sh $CPUS $RAM 
 
 $SDIR/make_read_network.pl filtered.read_type_strain.tsv  filtered.annotated_fcounts.tsv > nodes_and_edges.tsv &
 $SDIR/make_read_network.pl rRNA.shared_reads.tsv          filtered.annotated_fcounts.tsv > rRNA.nodes_and_edges.tsv &

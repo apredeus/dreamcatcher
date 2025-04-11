@@ -26,8 +26,8 @@ elif [[ $FLAG == "detected" ]]
 then
     RFLT=`grep "reads; of these"            detected.hisat2_map.log | awk '{print $1}'`
     RKUQ=`grep "superkingdom.*Bacteria$"    kuniq.report.txt        | cut -f2`
-    RD1=`grep "aligned exactly 1 time"      detected.hisat2_map.log | awk '{print $1}'`
-    RD2=`grep "aligned >1 times"            detected.hisat2_map.log | awk '{print $1}'`
+    RD1=`grep "aligned .*exactly 1 time"    detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
+    RD2=`grep "aligned .*>1 times"          detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
     RD3=$((RD1+RD2))
     ACK=`awk '/superkingdom\t    Bacteria/,/superkingdom\t    Archaea/'  kuniq.report.txt | grep -w assembly | wc -l`
     ACC=`cat detected_strains.list | wc -l`
@@ -52,8 +52,8 @@ then
 elif [[ $FLAG == "top" ]]
 then
     RFLT=`grep "reads; of these"            top.hisat2_map.log | awk '{print $1}'`
-    RT1=`grep "aligned exactly 1 time"      top.hisat2_map.log | awk '{print $1}'`
-    RT2=`grep "aligned >1 times"            top.hisat2_map.log | awk '{print $1}'`
+    RT1=`grep "aligned .*exactly 1 time"    top.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
+    RT2=`grep "aligned .*>1 times"          top.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
     RT3=$((RT1+RT2))
     ACT=`cat top_strains.list | wc -l`
     FCT=`awk '{sum+=$7} END {printf "%d",sum}' top.annotated_fcounts.tsv` ## approximate number of "useful" reads
@@ -71,6 +71,6 @@ then
     echo -e "\tlog_stat.sh top: $GTU unique genes spanning $BCS unique barcodes were detected"
     echo -e "\tlog_stat.sh top: a total of $UMI bacterial UMIs detected in all droplets"
 else 
-    >&2 echo "log_stat.sh: ERROR: \"$FLAG\" is not a recognised flag!" 
+    >&2 echo "log_stat.sh: ERROR: $FLAG is not a recognised flag!" 
     exit 1
 fi 

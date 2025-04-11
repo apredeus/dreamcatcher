@@ -16,8 +16,8 @@ RFLT=`grep "reads; of these"         2_detected_strains/detected.hisat2_map.log 
 RKUQ=`grep "superkingdom.*Bacteria$" 1_krakenuniq/kuniq.report.txt              | cut -f2`
 
 ## reads mapped to genomes of detected strains: 
-RD1=`grep "aligned exactly 1 time"   2_detected_strains/detected.hisat2_map.log | awk '{print $1}'`
-RD2=`grep "aligned >1 times"         2_detected_strains/detected.hisat2_map.log | awk '{print $1}'`
+RD1=`grep "aligned .*exactly 1 time" 2_detected_strains/detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
+RD2=`grep "aligned .*>1 times"       2_detected_strains/detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
 RD3=$((RD1+RD2))
 
 ## now, how many of the mapped reads were assigned to a (RefSeq) gene; also, how many were rRNA and non-rRNA
@@ -77,8 +77,8 @@ then
     RF6=$((RF4+RF5))
 
     ## we mapped to top strains, so this is the same as for detected
-    RT1=`grep "aligned exactly 1 time" 5_top_strains/top.hisat2_map.log | awk '{print $1}'`
-    RT2=`grep "aligned >1 times"       5_top_strains/top.hisat2_map.log | awk '{print $1}'`
+    RT1=`grep "aligned .*exactly 1 time" 5_top_strains/top.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
+    RT2=`grep "aligned .*>1 times"       5_top_strains/top.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
     RT3=$((RT1+RT2))
     RT4=`samtools view -@$CPUS 5_top_strains/top_filtered_gene_sorted.bam | grep -F -f 5_top_strains/top.protein_genes.list | cut -f1 | sort | uniq | wc -l`
     RT5=`samtools view -@$CPUS 5_top_strains/top_filtered_gene_sorted.bam | grep -F -f 5_top_strains/top.rRNA_genes.list    | cut -f1 | sort | uniq | wc -l`
