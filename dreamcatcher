@@ -155,9 +155,11 @@ then
     exit 1
 fi 
 
-## export script directory and singularity command
+## export script directory and singularity command, as well as available # of CPUS and RAM
 export SDIR=$SDIR
 export CMD=$CMD
+export RAM=$RAM
+export CPUS=$CPUS 
 
 if [[ $BULK == true ]]
 then
@@ -300,7 +302,7 @@ then
         echo "==> ["`date +%H:%M:%S`"] STEP 13: Tidy up the output directories .." 
         $SDIR/organise_output_dir.sh $BULK $BAM 
         echo "==> ["`date +%H:%M:%S`"] STEP 14: Calculating the mapping stats .." 
-        $SDIR/calculate_mapstats.sh $TAG $CPUS > mapstats.tsv
+        $SDIR/calculate_mapstats.sh $TAG > mapstats.tsv
 	    
         echo "ALL DREAMCATCHER PROCESSING IS DONE - 0 STRAINS PASSED FILTERING! BYE!!!"
         exit 1
@@ -310,7 +312,7 @@ fi
 ### step 13: make the network file. use fast(er) sort, since files can be big. note that we ONLY use the filtered genes to estimate the overlap etc
 echo "==> ["`date +%H:%M:%S`"] STEP 13: Make the network file using the overlapping reads .." 
 
-$SDIR/get_shared_uniq_reads.sh $CPUS $RAM 
+$SDIR/get_shared_uniq_reads.sh 
 
 $SDIR/make_read_network.pl filtered.read_type_strain.tsv  filtered.annotated_fcounts.tsv > nodes_and_edges.tsv &
 $SDIR/make_read_network.pl rRNA.shared_reads.tsv          filtered.annotated_fcounts.tsv > rRNA.nodes_and_edges.tsv &
@@ -411,7 +413,7 @@ then
     $SDIR/organise_output_dir.sh $BULK $BAM 
 
     echo "==> ["`date +%H:%M:%S`"] STEP 24: Calculating the mapping stats .." 
-    $SDIR/calculate_mapstats.sh $TAG $CPUS > mapstats.tsv
+    $SDIR/calculate_mapstats.sh $TAG > mapstats.tsv
     
     echo "ALL DREAMCATCHER PROCESSING (BULK MODE) IS DONE! ENJOY!!!"
 else 
@@ -428,7 +430,7 @@ else
     $SDIR/organise_output_dir.sh $BULK $BAM 
     
     echo "==> ["`date +%H:%M:%S`"] STEP 26: Calculating the mapping stats .." 
-    $SDIR/calculate_mapstats.sh $TAG $CPUS > mapstats.tsv
+    $SDIR/calculate_mapstats.sh $TAG > mapstats.tsv
 
     echo "ALL DREAMCATCHER PROCESSING (SINGLE CELL MODE) IS DONE! ENJOY!!!" 
 fi

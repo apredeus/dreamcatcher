@@ -1,7 +1,6 @@
 #!/bin/bash 
 
 TAG=$1
-CPUS=$2
 
 ## this is the master PER SAMPLE stat script 
 ## three main outputs are: 

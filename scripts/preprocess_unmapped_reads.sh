@@ -35,7 +35,7 @@ then
         ## case 1: STARsolo unmapped reads. Barocodes need to be corrected. 
         echo -e "\tpreprocess_unmapped_reads.sh: preparing unmapped reads in single cell mode, STARsolo raw unmapped reads are used." 
         $SDIR/make_umi_fastq.pl $FQDIR/$TAG Unmapped_filt_uncorr.R1.fastq ## this script filters homopolymers too 
-        $SDIR/get_barcode_corrections.sh $TAG $FQDIR
+        $SDIR/get_barcode_corrections.sh $FQDIR $TAG
         $SDIR/correct_barcodes.pl Unmapped_filt_uncorr.R1.fastq barcodes_vs_whitelist.tsv Unmapped_filt.R1.fastq
         $CMD pigz Unmapped_filt.R1.fastq
         rm Unmapped_filt_uncorr.R1.fastq barcodes_vs_whitelist.sam whitelist*.bt2

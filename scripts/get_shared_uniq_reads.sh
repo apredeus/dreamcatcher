@@ -1,9 +1,8 @@
 #!/bin/bash 
 
-CPUS=$1
-RAM=$2
+## available RAM and CPUS are exported from the main script 
 SORTCMD="sort -S $((RAM/CPUS))G --parallel=$CPUS"
-SORTCMD2="sort -S $((RAM/CPUS/4))G --parallel=$CPUS"
+SORTCMD2="sort -S $((RAM/CPUS/6))G --parallel=$CPUS"
 
 ## here we extract unqiue and shared reads, to make networks files with all/rRNA-only/non-rRNA-only reads
 ## networks are done with shared reads only  
