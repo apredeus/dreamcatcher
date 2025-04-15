@@ -163,12 +163,12 @@ export CPUS=$CPUS
 
 if [[ $BULK == true ]]
 then
-    echo "==> ["`date +%H:%M:%S`"] Initiating dreamcatcher run using BULK workflow!"  
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] Initiating dreamcatcher run using BULK workflow!"  
 else   
-    echo "==> ["`date +%H:%M:%S`"] Initiating dreamcatcher run using 10x single cell/spatial workflow!"
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] Initiating dreamcatcher run using 10x single cell/spatial workflow!"
 fi 
 
-echo "==> ["`date +%H:%M:%S`"] Following variables were set:"
+echo "==> ["$(date +'%d-%b-%Y, %T')"] Following variables were set:"
 echo
 echo "                             FQDIR: $FQDIR"
 echo "                              SDIR: $SDIR"
@@ -197,7 +197,7 @@ mkdir -p $TAG && cd $TAG
 ## single end reads are homopolymer-filtered and barcodes are corrected vs the whitelist in case of STARsolo unmapped reads 
 if [[ $SKIPREMAP == false ]]
 then
-	echo "==> ["`date +%H:%M:%S`"] STEP 1: Extract and preprocess the unmapped reads for further analysis.." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 1: Extract and preprocess the unmapped reads for further analysis.." 
 	$SDIR/preprocess_unmapped_reads.sh $FQDIR $TAG $BULK $BAM > preprocess_reads.log
     $SDIR/log_stat.sh preprocessed 
 
@@ -210,16 +210,16 @@ then
         exit 1
 	fi
 	
-	echo "==> ["`date +%H:%M:%S`"] STEP 2: Running KrakenUniq .." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 2: Running KrakenUniq .." 
 	if [[ $PAIRED == false ]] 
 	then
 	    $CMD krakenuniq --threads $CPUS --db $KUDB --preload-size ${RAM}G --output kuniq.output.txt \
 	        --report-file kuniq.report.txt Unmapped_filt.R1.fastq.gz &> kuniq.log
-	    $CMD pigz kuniq.output.txt
+	    $CMD pigz -f kuniq.output.txt
 	else 
 	    $CMD krakenuniq --threads $CPUS --db $KUDB --preload-size ${RAM}G --output kuniq.output.txt \
 	        --report-file kuniq.report.txt --paired Unmapped_filt.R1.fastq.gz Unmapped_filt.R2.fastq.gz &> kuniq.log
-	    $CMD pigz kuniq.output.txt
+	    $CMD pigz -f kuniq.output.txt
 	fi
 	
 	## KrakenUniq quits with no error and no output in some cases, still not sure why. Just re-run the job.  
@@ -229,63 +229,77 @@ then
 	    exit 1
 	fi
 	## step 3: this script will find the best RefSeq genome for each detected species, using KrakenUniq output
-	echo "==> ["`date +%H:%M:%S`"] STEP 3: Extracting unique bacterial RefSeq accessions .."
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 3: Extracting unique bacterial RefSeq accessions .."
 	$SDIR/kuniq_to_GCF.pl kuniq.report.txt $GSA $GENBANK > detected_strains.list 2> kuniq_to_GCF.log
+	
+    ## if no strains passed the filtering, we quit, but we DO generate a mapstat.tsv (mostly filled with zeroes).  
+	if [[ ! -s detected_strains.list ]]
+	then
+	    >&2 echo "ERROR: no strains have passed the filtering threshold at STEP 3! Cleaning up and exiting .." 
+
+        echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 4: Tidy up the output directories .." 
+        $SDIR/organise_output_dir.sh $BULK $BAM 
+        echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 5: Calculating the mapping stats .." 
+        $SDIR/calculate_mapstats.sh $TAG > mapstats.tsv
+	    
+        echo "ALL DREAMCATCHER PROCESSING IS DONE - 0 STRAINS WERE DETECTED! BYE!!!"
+        exit 1
+    fi
 
 	## step 4: now, make a combined genome and GFF files for all strains identified by KrakenUniq
-	echo "==> ["`date +%H:%M:%S`"] STEP 4: Generating a combined genome and GFF file for all bacterial species .." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 4: Generating a combined genome and GFF file for all bacterial species .." 
 	$SDIR/make_combined_reference.sh $NCBI detected_strains.list detected_strains &> detected.mkref.log  
 	
 	## steps 5-7: mapping to bacteria and human decoy. Notice the differential use of "-k/--max-seeds" and the relaxed soft-clipping penalty.
-	echo "==> ["`date +%H:%M:%S`"] STEP 5: Making combined Hisat2 index .." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 5: Making combined Hisat2 index .." 
 	$CMD hisat2-build detected_strains.fna detected_strains &> detected.hisat2_build.log
 	
 	if [[ $PAIRED == false ]] 
 	then 
-	    echo "==> ["`date +%H:%M:%S`"] STEP 6: Mapping original unmapped reads to the combined reference using Hisat2 .." 
+	    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 6: Mapping original unmapped reads to the combined reference using Hisat2 .." 
 	    $CMD hisat2 -t -p$CPUS -k 5000 --sp 1,1 --no-spliced-alignment --no-unal -U Unmapped_filt.R1.fastq.gz -x \
 	        detected_strains 2> detected.hisat2_map.log | $CMD samtools sort -@$CPUS --verbosity 0 -O BAM - > detected_strains.bam 2> /dev/null
 	  
-	    echo "==> ["`date +%H:%M:%S`"] STEP 7: Map same corrected reads to hisat2 index of T2T assembly."
+	    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 7: Map same corrected reads to hisat2 index of T2T assembly."
 	    $CMD hisat2 -t -p$CPUS -k 1 --max-seeds 1000 --sp 1,1 --no-unal -U Unmapped_filt.R1.fastq.gz -x \
 	        $HST2T 2> hisat2_human.log | $CMD samtools sort -@$CPUS --verbosity 0 -O BAM - > human_remap.bam 2> /dev/null
 	  
-	    echo "==> ["`date +%H:%M:%S`"] STEP 8: Running featureCounts with accurate multimapper counting; annotate each read with gene, and number of bacterial and human mismatches .." 
+	    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 8: Running featureCounts with accurate multimapper counting; annotate each read with gene, and number of bacterial and human mismatches .." 
 	    $CMD featureCounts -T $CPUS -M -O --fraction -t gene -g locus_tag -s 0 -a detected_strains.gff \
 	        -o detected.fcounts.tsv -R BAM detected_strains.bam &> detected.fcounts.log  
 	    rm detected_strains.bam
 	    mv detected_strains.bam.featureCounts.bam detected_fcounts.bam 
 	else 
-	    echo "==> ["`date +%H:%M:%S`"] STEP 6: Mapping original unmapped reads to the combined reference using Hisat2 .." 
+	    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 6: Mapping original unmapped reads to the combined reference using Hisat2 .." 
 	    $CMD hisat2 -t -p$CPUS -k 5000 --sp 1,1 --no-spliced-alignment --no-unal -1 Unmapped_filt.R1.fastq.gz -2 Unmapped_filt.R2.fastq.gz -x \
 	        detected_strains 2> detected.hisat2_map.log | $CMD samtools sort -@$CPUS --verbosity 0 -O BAM - > detected_strains.bam
 	  
-	    echo "==> ["`date +%H:%M:%S`"] STEP 7: Map same corrected reads to hisat2 index of T2T assembly."
+	    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 7: Map same corrected reads to hisat2 index of T2T assembly."
 	    $CMD hisat2 -t -p$CPUS -k 1 --max-seeds 1000 --sp 1,1 --no-unal -1 Unmapped_filt.R1.fastq.gz -2 Unmapped_filt.R2.fastq.gz -x \
 	    $HST2T 2> hisat2_human.log | $CMD samtools sort -@$CPUS --verbosity 0 -O BAM - > human_remap.bam
 	  
-	    echo "==> ["`date +%H:%M:%S`"] STEP 8: Running featureCounts with accurate multimapper counting; annotate each read with gene, and number of bacterial and human mismatches .." 
+	    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 8: Running featureCounts with accurate multimapper counting; annotate each read with gene, and number of bacterial and human mismatches .." 
 	    $CMD featureCounts -T $CPUS -p --countReadPairs -M -O --fraction -t gene -g locus_tag -s 0 -a detected_strains.gff \
 	        -o detected.fcounts.tsv -R BAM detected_strains.bam &> detected.fcounts.log
 	    rm detected_strains.bam
 	    mv detected_strains.bam.featureCounts.bam detected_fcounts.bam 
 	fi
 	
-	echo "==> ["`date +%H:%M:%S`"] STEP 9: Annotate reads with bacterial gene, and mismatch rate vs bacterial and human genomes .." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 9: Annotate reads with bacterial gene, and mismatch rate vs bacterial and human genomes .." 
 	$SDIR/annotate_mapped_reads.pl detected_fcounts.bam human_remap.bam > detected.read_to_gene_w_mismatches.tsv
 	
-	echo "==> ["`date +%H:%M:%S`"] STEP 10: Making a gene biotype table .." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 10: Making a gene biotype table .." 
 	$SDIR/extract_gene_biotypes.pl detected_strains.gff > gene_biotypes.tsv
 	
 	## step 11: annotate the table and generate a summary per bacterial assembly(==accession)
-	echo "==> ["`date +%H:%M:%S`"] STEP 11: Filtering/annotating the featureCounts table and generating summary per RefSeq accession .." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 11: Filtering/annotating the featureCounts table and generating summary per RefSeq accession .." 
 	$SDIR/make_summary_tables.pl detected.fcounts.tsv gene_biotypes.tsv detected.read_to_gene_w_mismatches.tsv $SEQ2TAXID detected
     awk '{if ($9 != "rRNA") {print $1}}' detected.annotated_fcounts.tsv > detected.protein_genes.list
     awk '{if ($9 == "rRNA") {print $1}}' detected.annotated_fcounts.tsv > detected.rRNA_genes.list
 	$SDIR/log_stat.sh detected
 	
 	### step 12: filter the annotated table based on the number of rRNA and non-rRNA genes etc. files filtered.summary.tsv and filtered.gene.list would be generated
-	echo "==> ["`date +%H:%M:%S`"] STEP 12: Filtering the accessions: keeping strains that pass our filtering criteria.." 
+	echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 12: Filtering the accessions: keeping strains that pass our filtering criteria.." 
 	cp $RDIR/data/blacklisted_genes.list .
 	$SDIR/filter_strains.pl detected.summary.tsv detected.annotated_fcounts.tsv blacklisted_genes.list > filter_strains.log
     grep -F -f filtered.gene.list detected.annotated_fcounts.tsv > filtered.annotated_fcounts.tsv
@@ -299,9 +313,9 @@ then
 	then
 	    >&2 echo "ERROR: no strains have passed the filtering threshold at STEP 11! Cleaning up and exiting .." 
 
-        echo "==> ["`date +%H:%M:%S`"] STEP 13: Tidy up the output directories .." 
+        echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 13: Tidy up the output directories .." 
         $SDIR/organise_output_dir.sh $BULK $BAM 
-        echo "==> ["`date +%H:%M:%S`"] STEP 14: Calculating the mapping stats .." 
+        echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 14: Calculating the mapping stats .." 
         $SDIR/calculate_mapstats.sh $TAG > mapstats.tsv
 	    
         echo "ALL DREAMCATCHER PROCESSING IS DONE - 0 STRAINS PASSED FILTERING! BYE!!!"
@@ -310,7 +324,7 @@ then
 fi
 
 ### step 13: make the network file. use fast(er) sort, since files can be big. note that we ONLY use the filtered genes to estimate the overlap etc
-echo "==> ["`date +%H:%M:%S`"] STEP 13: Make the network file using the overlapping reads .." 
+echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 13: Make the network file using the overlapping reads .." 
 
 $SDIR/get_shared_uniq_reads.sh 
 
@@ -320,44 +334,44 @@ $SDIR/make_read_network.pl protein.shared_reads.tsv       filtered.annotated_fco
 wait
 
 ## step 14: cluster the read network into a more representative set of strains!
-echo "==> ["`date +%H:%M:%S`"] STEP 14: Parse the network and get the definitive list of strains .." 
+echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 14: Parse the network and get the definitive list of strains .." 
 $CMD Rscript $SDIR/parse_read_network.R $GSA &> parse_read_network.log
 sort -u -t$'\t' -k15,15 --merge filtered.cluster.tsv > top.cluster.tsv
 
-echo "==> ["`date +%H:%M:%S`"] STEP 15: Making the new (top strain) bacterial reference and annotation, and building Hisat2 reference .."
+echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 15: Making the new (top strain) bacterial reference and annotation, and building Hisat2 reference .."
 cut -f1 top.cluster.tsv | grep -v RefSeq > top_strains.list
 $SDIR/make_combined_reference.sh $NCBI top_strains.list top_strains &> top.mkref.log 
 $CMD hisat2-build top_strains.fna top_strains &> top.hisat2_build.log 
 
 if [[ $PAIRED == false ]] 
 then 
-    echo "==> ["`date +%H:%M:%S`"] STEP 16: Mapping filtered unmapped single-end reads to the top strain reference using Hisat2 .." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 16: Mapping filtered unmapped single-end reads to the top strain reference using Hisat2 .." 
     $CMD hisat2 -t -p$CPUS -k 100 --sp 1,1 --no-spliced-alignment --no-unal -U Unmapped_filt.R1.fastq.gz -x \
         top_strains 2> top.hisat2_map.log | $CMD samtools sort -@$CPUS --verbosity 0 -O BAM - > top_strains.bam 2> /dev/null
   
-    echo "==> ["`date +%H:%M:%S`"] STEP 17: Running featureCounts (single-end) on top strains with accurate multimapper counting, output BAM" 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 17: Running featureCounts (single-end) on top strains with accurate multimapper counting, output BAM" 
     $CMD featureCounts -T $CPUS -M -O --fraction -t gene -g locus_tag -s 0 -a top_strains.gff \
         -o top.fcounts.tsv -R BAM top_strains.bam &> top.fcounts.log  
     mv top_strains.bam.featureCounts.bam top_fcounts.bam 
 else 
-    echo "==> ["`date +%H:%M:%S`"] STEP 16: Mapping filtered unmapped paired-end reads to the top strain reference using Hisat2 .." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 16: Mapping filtered unmapped paired-end reads to the top strain reference using Hisat2 .." 
     $CMD hisat2 -t -p$CPUS -k 100 --sp 1,1 --no-spliced-alignment --no-unal -1 Unmapped_filt.R1.fastq.gz -2 Unmapped_filt.R2.fastq.gz -x \
         top_strains 2> top.hisat2_map.log | $CMD samtools sort -@$CPUS --verbosity 0 -O BAM - > top_strains.bam
   
-    echo "==> ["`date +%H:%M:%S`"] STEP 17: Running featureCounts (paired-end) on top strains with accurate multimapper counting, output BAM" 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 17: Running featureCounts (paired-end) on top strains with accurate multimapper counting, output BAM" 
     $CMD featureCounts -T $CPUS -p --countReadPairs -M -O --fraction -t gene -g locus_tag -s 0 -a top_strains.gff \
         -o top.fcounts.tsv -R BAM top_strains.bam &> top.fcounts.log
     mv top_strains.bam.featureCounts.bam top_fcounts.bam 
 fi
 
   
-echo "==> ["`date +%H:%M:%S`"] STEP 18: Annotate reads with bacterial gene, and mismatch rate vs bacterial and human genomes .." 
+echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 18: Annotate reads with bacterial gene, and mismatch rate vs bacterial and human genomes .." 
 $SDIR/annotate_mapped_reads.pl top_fcounts.bam human_remap.bam > top.read_to_gene_w_mismatches.tsv
 	
-echo "==> ["`date +%H:%M:%S`"] STEP 19: Make annotated fcounts and summary table for top strains .." 
+echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 19: Make annotated fcounts and summary table for top strains .." 
 $SDIR/make_summary_tables.pl top.fcounts.tsv gene_biotypes.tsv top.read_to_gene_w_mismatches.tsv $SEQ2TAXID top
 
-echo "==> ["`date +%H:%M:%S`"] STEP 20: Make an annotation file of top strains without the bad genes, and with GCF (strain RefSeq) ID .."
+echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 20: Make an annotation file of top strains without the bad genes, and with GCF (strain RefSeq) ID .."
 ## top strains need to be filtered again, in order for all counts to be correct
 awk -F '\t' '($9 == "rRNA" && $10 > 3.4) || ($9 != "rRNA" && $10 > 2.3) || $11 > 0.1' top.annotated_fcounts.tsv | cut -f1 > top_removed.genes.list
 cat top_removed.genes.list blacklisted_genes.list | sort | uniq > top_bad.genes.list
@@ -366,7 +380,7 @@ $SDIR/filter_top_gff.pl top_strains.gff top_bad.genes.list $SEQ2TAXID > top_stra
 ## finally, let's do proper counting. We will OVERWRITE all of the old top* files 
 if [[ $PAIRED == false ]] 
 then
-    echo "==> ["`date +%H:%M:%S`"] STEP 21: Redo the counting with a new GFF (single-end mode) .."
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 21: Redo the counting with a new GFF (single-end mode) .."
     $CMD featureCounts -T $CPUS -M -O --fraction -t gene -g locus_tag -s 0 -a top_strains_filtered.gff \
         -o top.fcounts.tsv -R BAM top_strains.bam &> top.gene_fcounts.log
     $CMD samtools sort -@$CPUS top_strains.bam.featureCounts.bam > top_filtered_gene_sorted.bam 2> /dev/null
@@ -380,10 +394,10 @@ then
     $CMD samtools index top_filtered_strain_sorted.bam
     rm top_strains.bam.featureCounts.bam top_strains.bam 
 
-    echo "==> ["`date +%H:%M:%S`"] STEP 22: REMAKE annotated fcounts and summary table for top strains - now without human/mismatched/blacklisted genes.." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 22: REMAKE annotated fcounts and summary table for top strains - now without human/mismatched/blacklisted genes.." 
     $SDIR/make_summary_tables.pl top.fcounts.tsv gene_biotypes.tsv top.read_to_gene_w_mismatches.tsv $SEQ2TAXID top
 else 
-    echo "==> ["`date +%H:%M:%S`"] STEP 21: Redo the counting with a new GFF (paired-end mode) .."
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 21: Redo the counting with a new GFF (paired-end mode) .."
     $CMD featureCounts -T $CPUS -p --countReadPairs -M -O --fraction -t gene -g locus_tag -s 0 -a top_strains_filtered.gff \
         -o top.fcounts.tsv -R BAM top_strains.bam &> top.gene_fcounts.log
     $CMD samtools sort -@$CPUS top_strains.bam.featureCounts.bam > top_filtered_gene_sorted.bam 2> /dev/null
@@ -397,7 +411,7 @@ else
     $CMD samtools index top_filtered_strain_sorted.bam
     rm top_strains.bam.featureCounts.bam top_strains.bam 
 
-    echo "==> ["`date +%H:%M:%S`"] STEP 22: REMAKE annotated fcounts and summary table for top strains - now without human/mismatched/blacklisted genes.." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 22: REMAKE annotated fcounts and summary table for top strains - now without human/mismatched/blacklisted genes.." 
     $SDIR/make_summary_tables.pl top.fcounts.tsv gene_biotypes.tsv top.read_to_gene_w_mismatches.tsv $SEQ2TAXID top
 fi
 
@@ -409,27 +423,27 @@ $SDIR/log_stat.sh top
 
 if [[ $BULK == true ]]
 then
-    echo "==> ["`date +%H:%M:%S`"] STEP 23: Tidy up the output directories .." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 23: Tidy up the output directories .." 
     $SDIR/organise_output_dir.sh $BULK $BAM 
 
-    echo "==> ["`date +%H:%M:%S`"] STEP 24: Calculating the mapping stats .." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 24: Calculating the mapping stats .." 
     $SDIR/calculate_mapstats.sh $TAG > mapstats.tsv
     
     echo "ALL DREAMCATCHER PROCESSING (BULK MODE) IS DONE! ENJOY!!!"
 else 
-    echo "==> ["`date +%H:%M:%S`"] STEP 23: Running final quantification using UMI-tools .."
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 23: Running final quantification using UMI-tools .."
     ## one BAM has actual bacterial genes, another has RefSeq strain ID for "gene" (XT)
     $CMD umi_tools count --per-gene --gene-tag=XT --assigned-status-tag=XS --per-cell -I top_filtered_gene_sorted.bam   -S gene.umi_counts.tsv.gz   &>   gene.umi_tools_count.log 
     $CMD umi_tools count --per-gene --gene-tag=XT --assigned-status-tag=XS --per-cell -I top_filtered_strain_sorted.bam -S strain.umi_counts.tsv.gz &> strain.umi_tools_count.log 
 
-    echo "==> ["`date +%H:%M:%S`"] STEP 24: Generate barcode-to-species table from per-gene UMI-tools .." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 24: Generate barcode-to-species table from per-gene UMI-tools .." 
     $SDIR/barcode_to_species.pl strain.umi_counts.tsv.gz $GSA > barcode_to_species.tsv
 	$SDIR/log_stat.sh umi
     
-    echo "==> ["`date +%H:%M:%S`"] STEP 25: Tidy up the output directories .." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 25: Tidy up the output directories .." 
     $SDIR/organise_output_dir.sh $BULK $BAM 
     
-    echo "==> ["`date +%H:%M:%S`"] STEP 26: Calculating the mapping stats .." 
+    echo "==> ["$(date +'%d-%b-%Y, %T')"] STEP 26: Calculating the mapping stats .." 
     $SDIR/calculate_mapstats.sh $TAG > mapstats.tsv
 
     echo "ALL DREAMCATCHER PROCESSING (SINGLE CELL MODE) IS DONE! ENJOY!!!" 

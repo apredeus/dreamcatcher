@@ -37,13 +37,13 @@ then
         $SDIR/make_umi_fastq.pl $FQDIR/$TAG Unmapped_filt_uncorr.R1.fastq ## this script filters homopolymers too 
         $SDIR/get_barcode_corrections.sh $FQDIR $TAG
         $SDIR/correct_barcodes.pl Unmapped_filt_uncorr.R1.fastq barcodes_vs_whitelist.tsv Unmapped_filt.R1.fastq
-        $CMD pigz Unmapped_filt.R1.fastq
+        $CMD pigz -f Unmapped_filt.R1.fastq
         rm Unmapped_filt_uncorr.R1.fastq barcodes_vs_whitelist.sam whitelist*.bt2
     else
         ## case 2: STARsolo/Cell Ranger/Space Ranger 10x BAM file
         echo -e "\tpreprocess_unmapped_reads.sh: preparing unmapped reads in single cell mode, 10x BAM file is used." 
         $SDIR/make_umi_fastq.pl $FQDIR/$TAG Unmapped_filt.R1.fastq ## this script filters homopolymers too
-        $CMD pigz Unmapped_filt.R1.fastq
+        $CMD pigz -f Unmapped_filt.R1.fastq
     fi
 else
     ## for bulk, reads can come in BAM or STAR fastq, and can be SE/PE
@@ -52,15 +52,15 @@ else
     if [[ -s Unmapped_filt.R1.fastq && -s Unmapped_filt.R2.fastq ]]
     then 
         ## cases 3,4: paired-end reads (either from BAM or from unmapped fastq) 
-        $CMD pigz Unmapped_filt.R1.fastq
-        $CMD pigz Unmapped_filt.R2.fastq
+        $CMD pigz -f Unmapped_filt.R1.fastq
+        $CMD pigz -f Unmapped_filt.R2.fastq
         if [[ -s Unmapped_unfilt.R1.fastq ]] 
         then 
           rm Unmapped_unfilt.*.fastq
         fi
     else
         ## cases 5,6: single-end reads (either from BAM or from unmapped fastq)
-        $CMD pigz Unmapped_filt.R1.fastq
+        $CMD pigz -f Unmapped_filt.R1.fastq
         if [[ -s Unmapped_unfilt.R1.fastq ]] 
         then 
           rm Unmapped_unfilt.*.fastq

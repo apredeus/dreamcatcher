@@ -2,6 +2,13 @@
 
 TAG=$1
 
+if [[ $# -ne 1 ]] 
+then 
+    echo "Usage: ./calculate_mapstats.sh <sample_id>" 
+    echo "       (this script is ran after working directory reorganisation)"
+    exit 1
+fi
+
 ## this is the master PER SAMPLE stat script 
 ## three main outputs are: 
 ## (1) number of reads that maps to detected/filtered/top strains; 
@@ -9,33 +16,65 @@ TAG=$1
 ## (3) number of protein coding and rRNA genes in detected/filtered/top strains 
 
 ## get total, unmapped, unmapped-filtered, and assigned by KrakenUniq as bacterial
-RTOT=`perl -ne 'print "$1" if (m/(\d+) total reads, (\d+) reads not mapped/)' 0_preprocessed_reads/preprocess_reads.log`
-RUNM=`perl -ne 'print "$2" if (m/(\d+) total reads, (\d+) reads not mapped/)' 0_preprocessed_reads/preprocess_reads.log`
-RFLT=`grep "reads; of these"         2_detected_strains/detected.hisat2_map.log | awk '{print $1}'`
-RKUQ=`grep "superkingdom.*Bacteria$" 1_krakenuniq/kuniq.report.txt              | cut -f2`
 
-## reads mapped to genomes of detected strains: 
-RD1=`grep "aligned .*exactly 1 time" 2_detected_strains/detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
-RD2=`grep "aligned .*>1 times"       2_detected_strains/detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
-RD3=$((RD1+RD2))
+if [[ ! -s 0_preprocessed_reads/preprocess_reads.log ]]
+then
+    echo "calculate_mapstats.sh: ERROR - could not find the preprocessing log file (0_preprocessed_reads/preprocess_reads.log)! Exiting.." 
+    exit 1
+fi
 
-## now, how many of the mapped reads were assigned to a (RefSeq) gene; also, how many were rRNA and non-rRNA
-## (note that tRNA/tmRNA genes etc are included into "protein" genes for convenience
-RD4=`grep -F -f 2_detected_strains/detected.protein_genes.list 2_detected_strains/detected.read_to_gene_w_mismatches.tsv | cut -f1 | sort | uniq | wc -l`
-RD5=`grep -F -f 2_detected_strains/detected.rRNA_genes.list    2_detected_strains/detected.read_to_gene_w_mismatches.tsv | cut -f1 | sort | uniq | wc -l`
-RD6=$((RD4+RD5))
+RTOT=`perl -ne 'print "$1" if (m/(\d+) total reads, (\d+) reads not mapped/)'      0_preprocessed_reads/preprocess_reads.log`
+RUNM=`perl -ne 'print "$2" if (m/(\d+) total reads, (\d+) reads not mapped/)'      0_preprocessed_reads/preprocess_reads.log`
+RFLT=`perl -ne 'print "$1" if (m/filtered unmapped reads: outputted (\d+) reads/)' 0_preprocessed_reads/preprocess_reads.log`
+RKUQ=`grep "superkingdom.*Bacteria$" 1_krakenuniq/kuniq.report.txt | cut -f2`
 
-## another simple estimate: total detected genes, and rRNA/protein coding breakdown
-GD1=`cat 2_detected_strains/detected.protein_genes.list | wc -l`
-GD2=`cat 2_detected_strains/detected.rRNA_genes.list    | wc -l`
-GD3=$((GD1+GD2))
+if [[ $RKUQ == "" ]]
+then
+    RKUQ=0
+fi 
 
-## now do accessions, out out necessity - if no filtered strains were produced, all other stats have to be 0
-ACK=`awk '/superkingdom\t    Bacteria/,/superkingdom\t    Archaea/'  1_krakenuniq/kuniq.report.txt | grep -w assembly | wc -l`
-ACD=`cat 2_detected_strains/detected_strains.list | wc -l`
-ACA=`cut -f12 detected.annotated_fcounts.tsv | sort | uniq | wc -l` ## detected + at least 1 annotated gene is covered
-ACF=`cat 3_filtered_strains/filtered_strains.list | wc -l`
-ACT=`cat 5_top_strains/top_strains.list | wc -l`
+RD1=0
+RD2=0
+RD3=0
+RD4=0
+RD5=0
+RD6=0
+
+GD1=0
+GD2=0
+GD3=0
+
+ACK=0
+ACD=0
+ACA=0
+ACF=0
+ACT=0
+
+if (( `cat 2_detected_strains/detected_strains.list | wc -l` != 0 ))
+then
+    ## reads mapped to genomes of detected strains: 
+    RD1=`grep "aligned .*exactly 1 time" 2_detected_strains/detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
+    RD2=`grep "aligned .*>1 times"       2_detected_strains/detected.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
+    RD3=$((RD1+RD2))
+    
+    ## now, how many of the mapped reads were assigned to a (RefSeq) gene; also, how many were rRNA and non-rRNA
+    ## (note that tRNA/tmRNA genes etc are included into "protein" genes for convenience
+    RD4=`grep -F -f 2_detected_strains/detected.protein_genes.list 2_detected_strains/detected.read_to_gene_w_mismatches.tsv | cut -f1 | sort | uniq | wc -l`
+    RD5=`grep -F -f 2_detected_strains/detected.rRNA_genes.list    2_detected_strains/detected.read_to_gene_w_mismatches.tsv | cut -f1 | sort | uniq | wc -l`
+    RD6=$((RD4+RD5))
+    
+    ## another simple estimate: total detected genes, and rRNA/protein coding breakdown
+    GD1=`cat 2_detected_strains/detected.protein_genes.list | wc -l`
+    GD2=`cat 2_detected_strains/detected.rRNA_genes.list    | wc -l`
+    GD3=$((GD1+GD2))
+    
+    ## now do accessions, out out necessity - if no filtered strains were produced, all other stats have to be 0
+    ACK=`awk '/superkingdom\t    Bacteria/,/superkingdom\t    Archaea/'  1_krakenuniq/kuniq.report.txt | grep -w assembly | wc -l`
+    ACD=`cat 2_detected_strains/detected_strains.list | wc -l`
+    ACA=`cut -f12 detected.annotated_fcounts.tsv | sort | uniq | wc -l` ## detected + at least 1 annotated gene is covered
+    ACF=`cat 3_filtered_strains/filtered_strains.list | wc -l`
+    ACT=`cat 5_top_strains/top_strains.list | wc -l`
+fi
 
 ## now a key fork. if N(filt)>0, then N(top)>0 - it's a must. RF1..RF6 are similar read counts for filtered strains 
 ## as definted above for detected strains (RD1..RD6);
@@ -79,8 +118,8 @@ then
     RT1=`grep "aligned .*exactly 1 time" 5_top_strains/top.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
     RT2=`grep "aligned .*>1 times"       5_top_strains/top.hisat2_map.log | awk '{sum+=$1} END {printf "%d",sum}'`
     RT3=$((RT1+RT2))
-    RT4=`samtools view -@$CPUS 5_top_strains/top_filtered_gene_sorted.bam | grep -F -f 5_top_strains/top.protein_genes.list | cut -f1 | sort | uniq | wc -l`
-    RT5=`samtools view -@$CPUS 5_top_strains/top_filtered_gene_sorted.bam | grep -F -f 5_top_strains/top.rRNA_genes.list    | cut -f1 | sort | uniq | wc -l`
+    RT4=`$CMD samtools view -@$CPUS 5_top_strains/top_filtered_gene_sorted.bam | grep -F -f 5_top_strains/top.protein_genes.list | cut -f1 | sort | uniq | wc -l`
+    RT5=`$CMD samtools view -@$CPUS 5_top_strains/top_filtered_gene_sorted.bam | grep -F -f 5_top_strains/top.rRNA_genes.list    | cut -f1 | sort | uniq | wc -l`
     RT6=$((RT4+RT5))
 
     ## now count genes for filtered and top strains 
