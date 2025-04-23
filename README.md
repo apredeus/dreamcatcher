@@ -76,9 +76,9 @@ Files `detected.summary.tsv`, `filtered.summary.tsv`, and `top.summary.tsv` summ
 
 | RefSeq strain ID | Strain name | Strain taxid | Detected rRNA genes | Split read sum - rRNA | Raw read sum - rRNA | Mean rRNA mismatch rate (per 100bp) | Mean rRNA fraction T2T-human/phiX | Detected protein genes | Split read sum - protein | Raw read sum - protein | Mean protein mismatch rate (per 100bp) | Mean protein fraction T2T-human/phiX |
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-GCF_014083985.1 | Streptomyces sp. SCUT-3 | 2684469 14 | 0.061646 | 194 | 0.000 | 0.000 | 0 | 0.000000 | 0 | 0.000 | 0.000 |
+GCF_014083985.1 | Streptomyces sp. SCUT-3 | 2684469 | 14 | 0.061646 | 194 | 0.000 | 0.000 | 0 | 0.000000 | 0 | 0.000 | 0.000 |
 GCF_002861525.1 | Actinomyces urogenitalis strain=UMB0319 | 103621 | 2 | 0.349945 | 54 | 0.039 | 0.000 | 3 | 2.653839 | 10 | 0.403 | 0.000 | 
-GCF_014640315.1 | Hymenobacter glacieicola strain=CGMCC 1.12990 | 1562124 1 | 0.000397 | 4 | 0.000 | 0.000 | 2 | 1.022217 | 3 | 1.686 | 0.333 |
+GCF_014640315.1 | Hymenobacter glacieicola strain=CGMCC 1.12990 | 1562124 | 1 | 0.000397 | 4 | 0.000 | 0.000 | 2 | 1.022217 | 3 | 1.686 | 0.333 |
 GCF_029674705.1 | Escherichia coli O155:H21 strain=NWU_1 | 3038394 | 3 | 59.922806 | 10997 | 0.346 | 0.000 | 24 | 21.642791 | 68 | 0.796 | 0.000 |
  
 </div>
