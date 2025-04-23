@@ -51,8 +51,24 @@ Most important output files are also present in the root directory:
   - `kuniq.report.txt` - KrakenUniq report file that contains metagenomic classification for all reads unmapped to host, and can be visualised using [Pavian](https://github.com/fbreitwieser/pavian); 
   - `detected.annotated_fcounts.tsv`, `detected.summary.tsv` - per-gene and per-strain metrics for the detected strains, derived by mapping reads to a set of strains (`2_detected_strains/detected_strains.list`) with > 3 unique k-mers in KrakenUniq;  
   - `filtered.annotated_fcounts.tsv`, `filtered.summary.tsv` - per-gene and per-strain metrics for the filtered strains. Details of the filtering process could be found in `3_filtered_strains/filter_strains.log`; 
-  - `filtered.cluster.tsv`, `top.cluster.tsv` - results of read network clustering (input and output strains); 
+  - `filtered.cluster.tsv`, `top.cluster.tsv` - results of read network clustering (input and output strains);
+  - `mapstats.tsv` - detailed statistics of reads that were mapped/assigned to a gene in detected, filtered, and top strains; 
   - `barcode_to_species.tsv` - corrected barcode by identified bacterial species matrix. Not present if the tool was ran in the `--bulk` mode.
+
+Two file types that don't have a header are `*.summary.tsv` and `*.annotated_fcounts.tsv`. Given below is the description of each file. 
+
+Files `detected.annotated_fcounts.tsv`, `filtered.annotated_fcounts.tsv`, and `top.annotated_fcounts.tsv` all are made using `featureCounts` output, and extra annotation for each gene was added to them. There are 14 columns overall, and following table explains each one using an example output: 
+
+<div align="center">
+
+| RefSeq locus tag | Contig | Gene start | Gene end | Strand | Gene length | Split read count | Raw read count | Gene biotype | Mismatch rate | Fraction T2T-human/phiX | RefSeq strain ID | Strain name | Strain taxid | 
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+P9N54_RS23305 | NZ_CP121294.1 | 4776927 | 4778102 | - | 1176 | 0.142853 | 1 | protein_coding | 0.662 | 0.000 | GCF_029674705.1 | Escherichia coli O155:H21 strain=NWU_1 | 3038394 |
+P9N54_RS23360 | NZ_CP121294.1 | 4788469 | 4790003 | - | 1535 | 20.634720 | 6231 | rRNA | 0.516 | 0.000 | GCF_029674705.1 | Escherichia coli O155:H21 strain=NWU_1 | 3038394 |
+NX106_RS23395 | NZ_JAMSJK010000099.1 | 1 | 321 | + | 321 | 0.125000 | 1 | rRNA | 2.532 | 1.000 | GCF_024733345.1 | Escherichia ruysiae strain=C61-1 | 2608867 |
+NX106_RS23520 | NZ_JAMSJK010000126.1 | 194 | 280 | + | 87 | 0.003418 | 4 | rRNA | 0.625 | 0.000 | GCF_024733345.1 | Escherichia ruysiae strain=C61-1 | 2608867 |
+
+</div>
 
 ## Reference preparation 
 
