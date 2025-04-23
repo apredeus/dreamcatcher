@@ -61,7 +61,7 @@ Files `detected.annotated_fcounts.tsv`, `filtered.annotated_fcounts.tsv`, and `t
 
 <div align="center">
 
-| RefSeq locus tag | Contig | Gene start | Gene end | Strand | Gene length | Split read count | Raw read count | Gene biotype | Mismatch rate | Fraction T2T-human/phiX | RefSeq strain ID | Strain name | Strain taxid | 
+| RefSeq locus tag | Contig | Gene start | Gene end | Strand | Gene length | Split read count | Raw read count | Gene biotype | Mismatch rate (per 100bp) | Fraction T2T-human/phiX | RefSeq strain ID | Strain name | Strain taxid | 
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 P9N54_RS23305 | NZ_CP121294.1 | 4776927 | 4778102 | - | 1176 | 0.142853 | 1 | protein_coding | 0.662 | 0.000 | GCF_029674705.1 | Escherichia coli O155:H21 strain=NWU_1 | 3038394 |
 P9N54_RS23360 | NZ_CP121294.1 | 4788469 | 4790003 | - | 1535 | 20.634720 | 6231 | rRNA | 0.516 | 0.000 | GCF_029674705.1 | Escherichia coli O155:H21 strain=NWU_1 | 3038394 |
@@ -69,6 +69,21 @@ NX106_RS23395 | NZ_JAMSJK010000099.1 | 1 | 321 | + | 321 | 0.125000 | 1 | rRNA |
 NX106_RS23520 | NZ_JAMSJK010000126.1 | 194 | 280 | + | 87 | 0.003418 | 4 | rRNA | 0.625 | 0.000 | GCF_024733345.1 | Escherichia ruysiae strain=C61-1 | 2608867 |
 
 </div>
+
+Files `detected.summary.tsv`, `filtered.summary.tsv`, and `top.summary.tsv` summarise all the strains in the respective groups based on the detected genes. There are 13 columns that look as described below. Note that "protein" gene in the summary table is anything that is not rRNA in RefSeq `gene_biotype`; thus, noncoding RNAs, tRNAs, and other miscellaneus gene types are sometimes (rarely) included here.  
+
+<div align="center">
+
+| RefSeq strain ID | Strain name | Strain taxid | Detected rRNA genes | Split read sum - rRNA | Raw read sum - rRNA | Mean rRNA mismatch rate (per 100bp) | Mean rRNA fraction T2T-human/phiX | Detected protein genes | Split read sum - protein | Raw read sum - protein | Mean protein mismatch rate (per 100bp) | Mean protein fraction T2T-human/phiX |
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+GCF_014083985.1 | Streptomyces sp. SCUT-3 | 2684469 14 | 0.061646 | 194 | 0.000 | 0.000 | 0 | 0.000000 | 0 | 0.000 | 0.000 |
+GCF_002861525.1 | Actinomyces urogenitalis strain=UMB0319 | 103621 | 2 | 0.349945 | 54 | 0.039 | 0.000 | 3 | 2.653839 | 10 | 0.403 | 0.000 | 
+GCF_014640315.1 | Hymenobacter glacieicola strain=CGMCC 1.12990 | 1562124 1 | 0.000397 | 4 | 0.000 | 0.000 | 2 | 1.022217 | 3 | 1.686 | 0.333 |
+GCF_029674705.1 | Escherichia coli O155:H21 strain=NWU_1 | 3038394 | 3 | 59.922806 | 10997 | 0.346 | 0.000 | 24 | 21.642791 | 68 | 0.796 | 0.000 |
+ 
+</div>
+
+Mean number of mismatches and human/phiX contamination is used for filtering. Thus, no strains in the `filtered` or `top` cohort should have genes with mean mismatches over 3.4 (for rRNA)/2.3 (for protein), or with more than 0.100 human/phiX overlap. 
 
 ## Reference preparation 
 
