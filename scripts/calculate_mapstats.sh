@@ -25,7 +25,7 @@ fi
 
 RTOT=`perl -ne 'print "$1" if (m/(\d+) total reads, (\d+) reads not mapped/)'      0_preprocessed_reads/preprocess_reads.log`
 RUNM=`perl -ne 'print "$2" if (m/(\d+) total reads, (\d+) reads not mapped/)'      0_preprocessed_reads/preprocess_reads.log`
-RFLT=`perl -ne 'print "$1" if (m/filtered unmapped reads: outputted (\d+) reads/)' 0_preprocessed_reads/preprocess_reads.log`
+RFLT=`perl -ne 'print "$1" if (m/outputted (\d+) reads/)' 0_preprocessed_reads/preprocess_reads.log`
 RKUQ=`grep "superkingdom.*Bacteria$" 1_krakenuniq/kuniq.report.txt | cut -f2`
 
 if [[ $RKUQ == "" ]]
