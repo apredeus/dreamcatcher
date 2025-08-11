@@ -166,7 +166,7 @@ if (-s $dir."/Log.final.out") {
         my $total_unmapped = $total_reads - $total_mapped; 
         print STDOUT "make_umi_fastq.pl: using BAM input: $total_reads total reads, $total_unmapped reads not mapped to host genome..\n"; 
         print STDOUT "make_bulk_fastq.pl: extracting unmapped single-end reads from the BAM file!\n";
-        system "$cmd samtools fastq -\@4 -f4 -o Unmapped_unfilt.R1.fastq $bam"; 
+        system "$cmd samtools fastq -\@4 -f4 -0 Unmapped_unfilt.R1.fastq $bam";
     } 
     
     ## now we do the same thing as with the unmapped reads above (sync reading) 
@@ -213,7 +213,7 @@ if (-s $dir."/Log.final.out") {
         print STDOUT "make_bulk_fastq.pl: writing filtered unmapped reads: outputted $passed reads to Unmapped_filt.R1/2.fastq, discarded $discarded reads as low-complexity/short (<40bp) sequences..\n";
     } else { 
         ## same but for single-end reads 
-        open OUT1,">","Unmapped_unfilt.R1.fastq" or die "$!"; 
+        open OUT1,">","Unmapped_filt.R1.fastq" or die "$!"; 
         open READ1,"$cmd cat Unmapped_unfilt.R1.fastq |" or die "$!"; 
 
         my $nr = 1; 
