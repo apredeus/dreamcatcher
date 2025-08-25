@@ -151,7 +151,7 @@ if (-s $dir."/Log.final.out") {
     print STDOUT "make_bulk_fastq.pl: using the following input files: \n\tBAM = $bam\n";
 
     ## we need to check if the file was mapped as paired-end; for bulk, this changes some stats and fastq extraction samtools command.
-    my $preads = `grep \"properly paired\" host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`; 
+    my $preads = `grep \"paired in sequencing\" host.bam.flagstat | awk '{printf "%d",\$1+\$3}'`; 
     my $paired = ($preads > 0) ? 1 : 0; 
     if ($paired) { 
         my $total_reads  = `grep "primary\$"      host.bam.flagstat | awk '{printf "%d",\$1/2+\$3/2}'`; 
